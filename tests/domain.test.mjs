@@ -5,7 +5,10 @@ import {
   applyToResearchProject,
   createTeamRecruit,
   createInitialState,
+  deleteDatabaseRecord,
+  getDatabaseSnapshot,
   getCompetitionDetail,
+  listRegisteredUsers,
   listCertificateRecords,
   listCertificateCollection,
   listResearchApplicationsForMentor,
@@ -56,6 +59,72 @@ test("user can choose a permission role without identity verification", () => {
 
   assert.equal(mentor.user.role, "mentor");
   assert.equal(collector.user.role, "certificate_collector");
+});
+
+test("login uses the selected permission role when switching identities", () => {
+  const collector = registerUser(createInitialState(), {
+    role: "certificate_collector",
+    name: "同一邮箱",
+    email: "same@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+  const student = registerUser(collector.state, {
+    role: "student",
+    name: "同一邮箱",
+    email: "same@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+
+  const session = login(student.state, {
+    role: "student",
+    email: "same@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+
+  assert.equal(session.user.role, "student");
+});
+
+test("admin can inspect users and delete database records", () => {
+  const admin = registerUser(createInitialState(), {
+    role: "admin",
+    name: "管理员",
+    email: "admin@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+  const student = registerStudent(admin.state, {
+    name: "待清理同学",
+    email: "cleanup@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const uploaded = uploadCertificateRecord(student.state, {
+    studentUserId: student.user.id,
+    competitionId: "competition_1",
+    awardLevel: "三等奖",
+    awardDate: "2026-05-02",
+    fileName: "cleanup.png",
+    fileSizeBytes: 128 * 1024,
+    fileDataUrl: "data:image/png;base64,abc"
+  });
+
+  const users = listRegisteredUsers(uploaded.state, admin.user.id);
+  assert.deepEqual(
+    users.map((user) => user.role),
+    ["admin", "student"]
+  );
+
+  const snapshot = getDatabaseSnapshot(uploaded.state, admin.user.id);
+  assert.equal(snapshot.tables.certificateRecords.length, 1);
+
+  const deleted = deleteDatabaseRecord(uploaded.state, admin.user.id, {
+    table: "certificateRecords",
+    id: uploaded.certificateRecord.id
+  });
+  assert.equal(
+    getDatabaseSnapshot(deleted.state, admin.user.id).tables.certificateRecords.length,
+    0
+  );
 });
 
 test("student can browse opportunities across competitions and research projects", () => {
@@ -147,6 +216,28 @@ test("student can upload a valid certificate record and list it later", () => {
   const records = listCertificateRecords(uploaded.state, registered.user.id);
   assert.equal(records.length, 1);
   assert.equal(records[0].competitionTitle, "中国大学生服务外包创新创业大赛");
+});
+
+test("image certificate records keep a visible preview", () => {
+  const student = registerStudent(createInitialState(), {
+    name: "预览同学",
+    email: "preview@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+
+  const uploaded = uploadCertificateRecord(student.state, {
+    studentUserId: student.user.id,
+    competitionId: "competition_1",
+    awardLevel: "一等奖",
+    awardDate: "2026-05-03",
+    fileName: "award.png",
+    fileSizeBytes: 64 * 1024,
+    fileDataUrl: "data:image/png;base64,preview"
+  });
+
+  assert.equal(uploaded.certificateRecord.hasPreview, true);
+  assert.equal(uploaded.certificateRecord.previewUrl, "data:image/png;base64,preview");
 });
 
 test("certificate collector can review readable records from uploaders", () => {

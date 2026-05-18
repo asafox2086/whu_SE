@@ -99,7 +99,9 @@ h3 {
 
 .opportunities,
 .detail-panel,
-.mentor-panel {
+.mentor-panel,
+.certificate-panel,
+.admin-panel {
   grid-column: 2;
 }
 
@@ -197,13 +199,64 @@ button.secondary {
 }
 
 .item-card,
-.mini-card {
+.mini-card,
+.db-card,
+.db-row {
   display: grid;
   gap: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
   padding: 14px;
+}
+
+.certificate-panel {
+  min-height: 360px;
+}
+
+.certificate-preview {
+  width: 100%;
+  max-height: 260px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  object-fit: contain;
+  background: #f7fafc;
+}
+
+.certificate-preview.is-placeholder {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  color: var(--muted);
+}
+
+.database-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.db-card h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.db-card h3 span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.db-row {
+  background: #fbfcfd;
+}
+
+.db-row pre {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
 }
 
 .item-card p {
@@ -298,7 +351,9 @@ dd {
   .action-panel,
   .opportunities,
   .detail-panel,
-  .mentor-panel {
+  .mentor-panel,
+  .certificate-panel,
+  .admin-panel {
     grid-column: 1;
   }
 

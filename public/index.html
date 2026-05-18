@@ -28,6 +28,7 @@
               <option value="student">学生</option>
               <option value="mentor">导师</option>
               <option value="certificate_collector">证书收集者</option>
+              <option value="admin">管理员</option>
             </select>
           </label>
           <label>
@@ -121,8 +122,9 @@
         </form>
       </section>
 
-      <section class="panel action-panel" data-role-panel="student">
-        <h2>证书记录</h2>
+      <section class="panel certificate-panel" data-role-panel="student">
+        <p class="eyebrow">证书中心</p>
+        <h2>上传与查看证书</h2>
         <form data-certificate-form>
           <label>
             关联竞赛
@@ -145,10 +147,18 @@
         <div class="stack" data-certificate-list></div>
       </section>
 
-      <section class="panel action-panel" data-role-panel="certificate_collector">
-        <p class="eyebrow">证书收集者</p>
+      <section class="panel certificate-panel" data-role-panel="certificate_collector">
+        <p class="eyebrow">证书中心</p>
         <h2>证书汇总</h2>
         <div class="stack" data-certificate-collection></div>
+      </section>
+
+      <section class="panel admin-panel" data-role-panel="admin">
+        <p class="eyebrow">管理员模式</p>
+        <h2>注册用户</h2>
+        <div class="stack" data-admin-users></div>
+        <h2>数据库</h2>
+        <div class="database-grid" data-admin-database></div>
       </section>
 
       <section class="panel mentor-panel" data-role-panel="mentor">

@@ -2,12 +2,15 @@ import {
   applyToResearchProject,
   createInitialState,
   createTeamRecruit,
+  deleteDatabaseRecord,
   DomainError,
+  getDatabaseSnapshot,
   getCompetitionDetail,
   listCertificateCollection,
   listCertificateRecords,
   listFeedbackEntries,
   listOpportunities,
+  listRegisteredUsers,
   listResearchApplicationsForMentor,
   login,
   recordUsage,
@@ -37,6 +40,8 @@ const selectors = {
   certificateForm: document.querySelector("[data-certificate-form]"),
   certificateList: document.querySelector("[data-certificate-list]"),
   certificateCollection: document.querySelector("[data-certificate-collection]"),
+  adminUsers: document.querySelector("[data-admin-users]"),
+  adminDatabase: document.querySelector("[data-admin-database]"),
   mentorApplications: document.querySelector("[data-mentor-applications]"),
   feedbackForm: document.querySelector("[data-feedback-form]"),
   feedbackList: document.querySelector("[data-feedback-list]"),
@@ -51,6 +56,7 @@ selectors.recruitForm.addEventListener("submit", handleRecruitSubmit);
 selectors.researchApplyForm.addEventListener("submit", handleResearchApplySubmit);
 selectors.certificateForm.addEventListener("submit", handleCertificateSubmit);
 selectors.feedbackForm.addEventListener("submit", handleFeedbackSubmit);
+selectors.adminDatabase.addEventListener("click", handleAdminDatabaseClick);
 
 render();
 
@@ -159,26 +165,50 @@ function handleResearchApplySubmit(event) {
   }
 }
 
-function handleCertificateSubmit(event) {
+async function handleCertificateSubmit(event) {
   event.preventDefault();
 
   try {
     requireSession();
     const form = new FormData(event.currentTarget);
     const file = event.currentTarget.querySelector("input[type=file]").files[0];
+    const fileDataUrl = await readFileDataUrl(file);
     const uploaded = uploadCertificateRecord(state, {
       studentUserId: session.user.id,
       competitionId: form.get("competitionId"),
       awardLevel: form.get("awardLevel"),
       awardDate: form.get("awardDate"),
       fileName: file?.name,
-      fileSizeBytes: file?.size
+      fileSizeBytes: file?.size,
+      fileDataUrl
     });
     state = uploaded.state;
     trackUsage("upload_certificate_record", uploaded.certificateRecord.id);
     saveState();
     event.currentTarget.reset();
     showToast("证书记录已保存");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleAdminDatabaseClick(event) {
+  const button = event.target.closest("button[data-delete-table]");
+  if (!button) {
+    return;
+  }
+  try {
+    requireSession();
+    const deleted = deleteDatabaseRecord(state, session.user.id, {
+      table: button.dataset.deleteTable,
+      id: button.dataset.deleteId
+    });
+    state = deleted.state;
+    trackUsage("delete_database_record", `${button.dataset.deleteTable}:${button.dataset.deleteId}`);
+    saveState();
+    showToast("记录已删除");
+    renderAdmin();
     render();
   } catch (error) {
     showToast(error.message, true);
@@ -214,6 +244,7 @@ function render() {
   renderForms();
   renderCertificates();
   renderCertificateCollection();
+  renderAdmin();
   renderMentorApplications();
   renderFeedback();
 }
@@ -338,9 +369,10 @@ function renderCertificates() {
         .map(
           (record) => `
             <section class="mini-card">
+              ${renderCertificatePreview(record)}
               <strong>${escapeHtml(record.competitionTitle)}</strong>
               <span>${escapeHtml(record.awardLevel)} · ${escapeHtml(record.awardDate)}</span>
-              <small>${escapeHtml(record.fileName)}</small>
+              <small>${escapeHtml(record.fileSummary)}</small>
             </section>
           `
         )
@@ -360,6 +392,7 @@ function renderCertificateCollection() {
         .map(
           (record) => `
             <section class="mini-card">
+              ${renderCertificatePreview(record)}
               <strong>${escapeHtml(record.awardSummary)}</strong>
               <span>${escapeHtml(record.uploaderName)} · ${escapeHtml(record.awardDate)}</span>
               <small>${escapeHtml(record.fileSummary)}</small>
@@ -367,6 +400,60 @@ function renderCertificateCollection() {
           `
         )
         .join("");
+}
+
+function renderAdmin() {
+  if (!session || session.user.role !== "admin") {
+    selectors.adminUsers.innerHTML = `<p class="empty">切换为管理员后显示注册用户。</p>`;
+    selectors.adminDatabase.innerHTML = "";
+    return;
+  }
+
+  const users = listRegisteredUsers(state, session.user.id);
+  selectors.adminUsers.innerHTML = users
+    .map(
+      (user) => `
+        <section class="mini-card">
+          <strong>${escapeHtml(user.name)} · ${escapeHtml(user.roleLabel)}</strong>
+          <span>${escapeHtml(user.email)} · ${escapeHtml(user.status)}</span>
+          <small>${escapeHtml(user.id)}</small>
+        </section>
+      `
+    )
+    .join("");
+
+  const snapshot = getDatabaseSnapshot(state, session.user.id);
+  const deletableTables = new Set([
+    "teamRecruits",
+    "applications",
+    "certificateRecords",
+    "usageEvents",
+    "feedbackEntries"
+  ]);
+  selectors.adminDatabase.innerHTML = Object.entries(snapshot.tables)
+    .map(([table, rows]) => {
+      const rowList = rows.length === 0
+        ? `<p class="empty">空表</p>`
+        : rows
+            .map(
+              (row) => `
+                <section class="db-row">
+                  <pre>${escapeHtml(JSON.stringify(row, null, 2))}</pre>
+                  ${deletableTables.has(table)
+                    ? `<button class="secondary" data-delete-table="${table}" data-delete-id="${escapeHtml(row.id)}">删除</button>`
+                    : ""}
+                </section>
+              `
+            )
+            .join("");
+      return `
+        <article class="db-card">
+          <h3>${escapeHtml(table)} <span>${rows.length}</span></h3>
+          ${rowList}
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function renderMentorApplications() {
@@ -403,6 +490,13 @@ function renderFeedback() {
         .join("");
 }
 
+function renderCertificatePreview(record) {
+  if (record.hasPreview && record.previewUrl) {
+    return `<img class="certificate-preview" src="${escapeHtml(record.previewUrl)}" alt="证书预览">`;
+  }
+  return `<div class="certificate-preview is-placeholder">暂无图片预览</div>`;
+}
+
 function loadState() {
   const stored = localStorage.getItem(storageKey);
   if (!stored) {
@@ -414,6 +508,7 @@ function loadState() {
   return {
     ...defaults,
     ...parsed,
+    admins: parsed.admins ?? [],
     certificateCollectors: parsed.certificateCollectors ?? [],
     usageEvents: parsed.usageEvents ?? [],
     feedbackEntries: parsed.feedbackEntries ?? []
@@ -432,6 +527,19 @@ function saveAll() {
 
 function saveState() {
   localStorage.setItem(storageKey, JSON.stringify(state));
+}
+
+function readFileDataUrl(file) {
+  if (!file || !/^image\//.test(file.type)) {
+    return Promise.resolve("");
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(`${reader.result ?? ""}`));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsDataURL(file);
+  });
 }
 
 function trackUsage(action, target = "") {
@@ -471,7 +579,8 @@ function roleLabel(role) {
   const labels = {
     student: "学生",
     mentor: "导师",
-    certificate_collector: "证书收集者"
+    certificate_collector: "证书收集者",
+    admin: "管理员"
   };
   return labels[role] ?? "未知身份";
 }

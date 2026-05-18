@@ -12,6 +12,7 @@ export function createInitialState() {
   return {
     users: [],
     students: [],
+    admins: [],
     mentors: [
       {
         id: "mentor_1",
@@ -77,8 +78,8 @@ export function registerUser(state, payload) {
   if (password.length < 8) {
     throw new DomainError("密码至少需要 8 位", "WEAK_PASSWORD");
   }
-  if (next.users.some((user) => user.email === email)) {
-    throw new DomainError("邮箱已被注册", "EMAIL_TAKEN");
+  if (next.users.some((user) => user.email === email && user.role === role)) {
+    throw new DomainError("该邮箱已注册这个权限身份", "EMAIL_ROLE_TAKEN");
   }
 
   const user = {
@@ -114,6 +115,13 @@ export function registerUser(state, payload) {
       name
     });
   }
+  if (role === "admin") {
+    next.admins.push({
+      id: nextId("admin", next.admins ?? []),
+      userId: user.id,
+      name
+    });
+  }
 
   return {
     state: next,
@@ -124,7 +132,10 @@ export function registerUser(state, payload) {
 export function login(state, payload) {
   const email = normalizeEmail(payload.email);
   const password = requiredText(payload.password, "密码");
-  const user = state.users.find((candidate) => candidate.email === email);
+  const role = payload.role ? normalizeRole(payload.role) : null;
+  const user = state.users.find(
+    (candidate) => candidate.email === email && (!role || candidate.role === role)
+  );
 
   if (!user || user.passwordHash !== hashPassword(password)) {
     throw new DomainError("邮箱或密码错误", "BAD_CREDENTIALS");
@@ -305,6 +316,8 @@ export function uploadCertificateRecord(state, payload) {
     fileUrl: `/uploads/certificates/${encodeURIComponent(fileName)}`,
     fileName,
     fileSizeBytes,
+    previewUrl: isImageFile(fileName) ? optionalText(payload.fileDataUrl, "") : "",
+    hasPreview: isImageFile(fileName) && Boolean(`${payload.fileDataUrl ?? ""}`.trim()),
     status: "完成"
   };
 
@@ -379,10 +392,69 @@ export function listFeedbackEntries(state) {
   return feedbackEntriesOf(state).map((feedback) => presentFeedback(state, feedback));
 }
 
+export function listRegisteredUsers(state, adminUserId) {
+  findAdminByUserId(state, adminUserId);
+  return state.users.map(publicUser).map((user) => ({
+    ...user,
+    roleLabel: roleLabel(user.role)
+  }));
+}
+
+export function getDatabaseSnapshot(state, adminUserId) {
+  findAdminByUserId(state, adminUserId);
+  return {
+    tables: {
+      users: state.users.map(publicUser),
+      students: state.students,
+      mentors: state.mentors,
+      certificateCollectors: state.certificateCollectors ?? [],
+      admins: state.admins ?? [],
+      competitions: state.competitions,
+      researchProjects: state.researchProjects,
+      teamRecruits: state.teamRecruits,
+      applications: state.applications,
+      certificateRecords: certificateRecordsOf(state),
+      usageEvents: usageEventsOf(state),
+      feedbackEntries: feedbackEntriesOf(state)
+    }
+  };
+}
+
+export function deleteDatabaseRecord(state, adminUserId, payload) {
+  findAdminByUserId(state, adminUserId);
+  const table = requiredText(payload.table, "数据表");
+  const id = requiredText(payload.id, "记录ID");
+  const deletableTables = new Set([
+    "teamRecruits",
+    "applications",
+    "certificateRecords",
+    "usageEvents",
+    "feedbackEntries"
+  ]);
+  if (!deletableTables.has(table)) {
+    throw new DomainError("该数据表不允许在 MVP 中删除", "TABLE_NOT_DELETABLE");
+  }
+
+  const next = cloneState(state);
+  next[table] = (next[table] ?? []).filter((record) => record.id !== id);
+  return {
+    state: next
+  };
+}
+
 function cloneState(state) {
   return globalThis.structuredClone
     ? globalThis.structuredClone(state)
     : JSON.parse(JSON.stringify(state));
+}
+
+function findAdminByUserId(state, userId) {
+  const user = state.users.find((candidate) => candidate.id === userId);
+  const admin = (state.admins ?? []).find((candidate) => candidate.userId === userId);
+  if (!user || !admin || user.role !== "admin") {
+    throw new DomainError("只有管理员可以执行该操作", "ADMIN_REQUIRED");
+  }
+  return admin;
 }
 
 function findCertificateCollectorByUserId(state, userId) {
@@ -436,11 +508,16 @@ function formatBytes(bytes) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function isImageFile(fileName) {
+  return /\.(jpg|jpeg|png)$/i.test(fileName);
+}
+
 function roleLabel(role) {
   const labels = {
     student: "学生",
     mentor: "导师",
-    certificate_collector: "证书收集者"
+    certificate_collector: "证书收集者",
+    admin: "管理员"
   };
   return labels[role] ?? "未知身份";
 }
@@ -540,7 +617,7 @@ function publicUser(user) {
 
 function normalizeRole(role) {
   const normalized = `${role ?? "student"}`.trim();
-  const roles = new Set(["student", "mentor", "certificate_collector"]);
+  const roles = new Set(["student", "mentor", "certificate_collector", "admin"]);
   if (!roles.has(normalized)) {
     throw new DomainError("权限身份不正确", "INVALID_ROLE");
   }
