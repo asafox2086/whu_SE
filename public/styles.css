@@ -248,15 +248,35 @@ button.secondary {
 
 .db-row {
   background: #fbfcfd;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
 }
 
-.db-row pre {
-  max-height: 220px;
-  margin: 0;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 12px;
+.db-row strong,
+.db-row span {
+  display: block;
+}
+
+.db-row span {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.record-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.record-fields div {
+  border-left: 3px solid var(--line);
+  padding-left: 8px;
+}
+
+.record-fields dd {
+  overflow-wrap: anywhere;
+  font-weight: 600;
 }
 
 .item-card p {

@@ -4,7 +4,7 @@ import {
   createTeamRecruit,
   deleteDatabaseRecord,
   DomainError,
-  getDatabaseSnapshot,
+  getAdminDatabaseView,
   getCompetitionDetail,
   listCertificateCollection,
   listCertificateRecords,
@@ -167,11 +167,12 @@ function handleResearchApplySubmit(event) {
 
 async function handleCertificateSubmit(event) {
   event.preventDefault();
+  const formElement = event.currentTarget;
 
   try {
     requireSession();
-    const form = new FormData(event.currentTarget);
-    const file = event.currentTarget.querySelector("input[type=file]").files[0];
+    const form = new FormData(formElement);
+    const file = formElement.querySelector("input[type=file]").files[0];
     const fileDataUrl = await readFileDataUrl(file);
     const uploaded = uploadCertificateRecord(state, {
       studentUserId: session.user.id,
@@ -185,7 +186,7 @@ async function handleCertificateSubmit(event) {
     state = uploaded.state;
     trackUsage("upload_certificate_record", uploaded.certificateRecord.id);
     saveState();
-    event.currentTarget.reset();
+    formElement.reset();
     showToast("证书记录已保存");
     render();
   } catch (error) {
@@ -422,25 +423,33 @@ function renderAdmin() {
     )
     .join("");
 
-  const snapshot = getDatabaseSnapshot(state, session.user.id);
-  const deletableTables = new Set([
-    "teamRecruits",
-    "applications",
-    "certificateRecords",
-    "usageEvents",
-    "feedbackEntries"
-  ]);
-  selectors.adminDatabase.innerHTML = Object.entries(snapshot.tables)
-    .map(([table, rows]) => {
-      const rowList = rows.length === 0
+  const view = getAdminDatabaseView(state, session.user.id);
+  selectors.adminDatabase.innerHTML = view.tables
+    .map((table) => {
+      const rowList = table.records.length === 0
         ? `<p class="empty">空表</p>`
-        : rows
+        : table.records
             .map(
-              (row) => `
+              (record) => `
                 <section class="db-row">
-                  <pre>${escapeHtml(JSON.stringify(row, null, 2))}</pre>
-                  ${deletableTables.has(table)
-                    ? `<button class="secondary" data-delete-table="${table}" data-delete-id="${escapeHtml(row.id)}">删除</button>`
+                  <div>
+                    <strong>${escapeHtml(record.title)}</strong>
+                    <span>${escapeHtml(record.summary)}</span>
+                    <dl class="record-fields">
+                      ${record.fields
+                        .map(
+                          (field) => `
+                            <div>
+                              <dt>${escapeHtml(field.label)}</dt>
+                              <dd>${escapeHtml(field.value)}</dd>
+                            </div>
+                          `
+                        )
+                        .join("")}
+                    </dl>
+                  </div>
+                  ${record.canDelete
+                    ? `<button class="secondary" data-delete-table="${table.name}" data-delete-id="${escapeHtml(record.id)}">删除</button>`
                     : ""}
                 </section>
               `
@@ -448,7 +457,7 @@ function renderAdmin() {
             .join("");
       return `
         <article class="db-card">
-          <h3>${escapeHtml(table)} <span>${rows.length}</span></h3>
+          <h3>${escapeHtml(table.label)} <span>${table.records.length}</span></h3>
           ${rowList}
         </article>
       `;

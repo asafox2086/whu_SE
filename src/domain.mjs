@@ -420,11 +420,116 @@ export function getDatabaseSnapshot(state, adminUserId) {
   };
 }
 
+export function getAdminDatabaseView(state, adminUserId) {
+  findAdminByUserId(state, adminUserId);
+  const definitions = [
+    {
+      name: "users",
+      label: "注册用户",
+      records: state.users.map((user) =>
+        readableRecord(user.id, user.name, `${roleLabel(user.role)} · ${user.email}`, [
+          ["身份", roleLabel(user.role)],
+          ["邮箱", user.email],
+          ["状态", user.status]
+        ])
+      )
+    },
+    {
+      name: "competitions",
+      label: "竞赛",
+      records: state.competitions.map((competition) =>
+        readableRecord(competition.id, competition.title, `${competition.level} · ${competition.qqGroup}`, [
+          ["级别", competition.level],
+          ["时间", `${competition.startDate} 至 ${competition.endDate}`],
+          ["官网", competition.officialUrl],
+          ["交流群", competition.qqGroup]
+        ], true)
+      )
+    },
+    {
+      name: "researchProjects",
+      label: "科研项目",
+      records: state.researchProjects.map((project) =>
+        readableRecord(project.id, project.title, `${project.direction} · ${project.status}`, [
+          ["方向", project.direction],
+          ["技术栈", project.techStack.join(" / ")],
+          ["交流群", project.qqGroup],
+          ["状态", project.status]
+        ], true)
+      )
+    },
+    {
+      name: "teamRecruits",
+      label: "组队招募",
+      records: state.teamRecruits.map((recruit) =>
+        readableRecord(recruit.id, recruit.title, `${recruit.status} · ${recruit.contact}`, [
+          ["竞赛ID", recruit.competitionId],
+          ["技能", recruit.skills.join(" / ")],
+          ["联系方式", recruit.contact],
+          ["状态", recruit.status]
+        ], true)
+      )
+    },
+    {
+      name: "applications",
+      label: "申请",
+      records: state.applications.map((application) =>
+        readableRecord(application.id, application.status, `${application.targetType} · ${application.targetId}`, [
+          ["目标", `${application.targetType}:${application.targetId}`],
+          ["学生ID", application.studentId],
+          ["陈述", application.statement],
+          ["状态", application.status]
+        ], true)
+      )
+    },
+    {
+      name: "certificateRecords",
+      label: "证书记录",
+      records: certificateRecordsOf(state).map((record) => {
+        const presented = presentCertificateRecord(state, record);
+        return readableRecord(record.id, presented.awardSummary, presented.uploaderName, [
+          ["上传者", presented.uploaderName],
+          ["获奖时间", record.awardDate],
+          ["文件", presented.fileSummary],
+          ["图片预览", presented.hasPreview ? "有" : "无"]
+        ], true);
+      })
+    },
+    {
+      name: "usageEvents",
+      label: "使用记录",
+      records: usageEventsOf(state).map((event) =>
+        readableRecord(event.id, event.action, event.target || "无目标", [
+          ["用户ID", event.userId ?? "匿名"],
+          ["目标", event.target || "无"],
+          ["时间", event.occurredAt]
+        ], true)
+      )
+    },
+    {
+      name: "feedbackEntries",
+      label: "使用反馈",
+      records: feedbackEntriesOf(state).map((feedback) =>
+        readableRecord(feedback.id, feedback.painPoint, `${feedback.rating}/5 · ${feedback.contact}`, [
+          ["联系方式", feedback.contact],
+          ["评分", `${feedback.rating}/5`],
+          ["内容", feedback.message],
+          ["时间", feedback.submittedAt]
+        ], true)
+      )
+    }
+  ];
+
+  return { tables: definitions };
+}
+
 export function deleteDatabaseRecord(state, adminUserId, payload) {
   findAdminByUserId(state, adminUserId);
   const table = requiredText(payload.table, "数据表");
   const id = requiredText(payload.id, "记录ID");
   const deletableTables = new Set([
+    "competitions",
+    "researchProjects",
     "teamRecruits",
     "applications",
     "certificateRecords",
@@ -437,6 +542,15 @@ export function deleteDatabaseRecord(state, adminUserId, payload) {
 
   const next = cloneState(state);
   next[table] = (next[table] ?? []).filter((record) => record.id !== id);
+  if (table === "competitions") {
+    next.teamRecruits = next.teamRecruits.filter((record) => record.competitionId !== id);
+    next.certificateRecords = certificateRecordsOf(next).filter((record) => record.competitionId !== id);
+  }
+  if (table === "researchProjects") {
+    next.applications = next.applications.filter(
+      (record) => !(record.targetType === "research" && record.targetId === id)
+    );
+  }
   return {
     state: next
   };
@@ -545,6 +659,16 @@ function normalizeTags(tags, label) {
 
 function nextId(prefix, collection) {
   return `${prefix}_${collection.length + 1}`;
+}
+
+function readableRecord(id, title, summary, fields, canDelete = false) {
+  return {
+    id,
+    title,
+    summary,
+    fields: fields.map(([label, value]) => ({ label, value })),
+    canDelete
+  };
 }
 
 function presentCertificateRecord(state, certificateRecord) {

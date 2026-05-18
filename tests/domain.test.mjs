@@ -6,6 +6,7 @@ import {
   createTeamRecruit,
   createInitialState,
   deleteDatabaseRecord,
+  getAdminDatabaseView,
   getDatabaseSnapshot,
   getCompetitionDetail,
   listRegisteredUsers,
@@ -123,6 +124,46 @@ test("admin can inspect users and delete database records", () => {
   });
   assert.equal(
     getDatabaseSnapshot(deleted.state, admin.user.id).tables.certificateRecords.length,
+    0
+  );
+});
+
+test("admin database view is readable and supports deleting competitions and research projects", () => {
+  const admin = registerUser(createInitialState(), {
+    role: "admin",
+    name: "管理员",
+    email: "admin-view@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+
+  const view = getAdminDatabaseView(admin.state, admin.user.id);
+  const competitionTable = view.tables.find((table) => table.name === "competitions");
+  const researchTable = view.tables.find((table) => table.name === "researchProjects");
+
+  assert.equal(competitionTable.label, "竞赛");
+  assert.equal(competitionTable.records[0].title, "中国大学生服务外包创新创业大赛");
+  assert.deepEqual(competitionTable.records[0].fields[0], {
+    label: "级别",
+    value: "国家级"
+  });
+  assert.equal(competitionTable.records[0].canDelete, true);
+  assert.equal(researchTable.records[0].canDelete, true);
+
+  const withoutCompetition = deleteDatabaseRecord(admin.state, admin.user.id, {
+    table: "competitions",
+    id: "competition_1"
+  });
+  assert.equal(
+    getDatabaseSnapshot(withoutCompetition.state, admin.user.id).tables.competitions.length,
+    1
+  );
+
+  const withoutResearch = deleteDatabaseRecord(withoutCompetition.state, admin.user.id, {
+    table: "researchProjects",
+    id: "research_1"
+  });
+  assert.equal(
+    getDatabaseSnapshot(withoutResearch.state, admin.user.id).tables.researchProjects.length,
     0
   );
 });
