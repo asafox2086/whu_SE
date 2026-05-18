@@ -7,10 +7,15 @@ import {
   createInitialState,
   getCompetitionDetail,
   listCertificateRecords,
+  listCertificateCollection,
   listResearchApplicationsForMentor,
   listOpportunities,
   login,
+  listFeedbackEntries,
+  recordUsage,
+  registerUser,
   registerStudent,
+  submitFeedback,
   uploadCertificateRecord
 } from "../src/domain.mjs";
 
@@ -33,6 +38,24 @@ test("student can register and then log in", () => {
 
   assert.equal(session.user.name, "陈星");
   assert.match(session.token, /^session_/);
+});
+
+test("user can choose a permission role without identity verification", () => {
+  const mentor = registerUser(createInitialState(), {
+    role: "mentor",
+    name: "周同学",
+    email: "mentor-like@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+  const collector = registerUser(mentor.state, {
+    role: "certificate_collector",
+    name: "材料同学",
+    email: "collector-like@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+
+  assert.equal(mentor.user.role, "mentor");
+  assert.equal(collector.user.role, "certificate_collector");
 });
 
 test("student can browse opportunities across competitions and research projects", () => {
@@ -124,4 +147,68 @@ test("student can upload a valid certificate record and list it later", () => {
   const records = listCertificateRecords(uploaded.state, registered.user.id);
   assert.equal(records.length, 1);
   assert.equal(records[0].competitionTitle, "中国大学生服务外包创新创业大赛");
+});
+
+test("certificate collector can review readable records from uploaders", () => {
+  const student = registerStudent(createInitialState(), {
+    name: "赵同学",
+    email: "zhao@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "信息安全",
+    githubUrl: ""
+  });
+  const uploadedByStudent = uploadCertificateRecord(student.state, {
+    studentUserId: student.user.id,
+    competitionId: "competition_1",
+    awardLevel: "二等奖",
+    awardDate: "2026-05-01",
+    fileName: "certificate.pdf",
+    fileSizeBytes: 2 * 1024 * 1024
+  });
+  const collector = registerUser(uploadedByStudent.state, {
+    role: "certificate_collector",
+    name: "材料收集员",
+    email: "collector@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+
+  const collection = listCertificateCollection(
+    collector.state,
+    collector.user.id
+  );
+
+  assert.equal(collection.length, 1);
+  assert.equal(collection[0].uploaderName, "赵同学");
+  assert.equal(collection[0].awardSummary, "中国大学生服务外包创新创业大赛 · 二等奖");
+  assert.equal(collection[0].fileSummary, "certificate.pdf · 2.0 MB");
+});
+
+test("early user usage information and manual feedback can be collected", () => {
+  const registered = registerUser(createInitialState(), {
+    role: "student",
+    name: "反馈同学",
+    email: "feedback@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const used = recordUsage(registered.state, {
+    userId: registered.user.id,
+    action: "view_opportunity",
+    target: "competition_1"
+  });
+
+  const submitted = submitFeedback(used.state, {
+    userId: registered.user.id,
+    contact: "feedback@whu.edu.cn",
+    painPoint: "找队友信息太分散",
+    message: "希望组队招募能直接看到联系方式和技能标签。",
+    rating: 4
+  });
+
+  const entries = listFeedbackEntries(submitted.state);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].userName, "反馈同学");
+  assert.equal(entries[0].roleLabel, "学生");
+  assert.equal(entries[0].usageCount, 1);
+  assert.equal(entries[0].painPoint, "找队友信息太分散");
 });

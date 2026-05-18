@@ -12,13 +12,24 @@
         <p class="eyebrow">星轨平台 MVP</p>
         <h1>校园竞赛与科研机会工作台</h1>
       </div>
-      <span class="user-badge" data-user-badge>未登录</span>
+      <div class="session-tools">
+        <span class="user-badge" data-user-badge>未登录</span>
+        <button class="secondary" data-logout hidden>切换身份</button>
+      </div>
     </header>
 
     <main class="layout">
       <section class="panel auth-panel">
-        <h2>学生入口</h2>
+        <h2>用户入口</h2>
         <form data-auth-form>
+          <label>
+            权限身份
+            <select name="role">
+              <option value="student">学生</option>
+              <option value="mentor">导师</option>
+              <option value="certificate_collector">证书收集者</option>
+            </select>
+          </label>
           <label>
             姓名
             <input name="name" autocomplete="name" placeholder="陈星">
@@ -38,6 +49,10 @@
           <label>
             GitHub
             <input name="githubUrl" placeholder="https://github.com/you">
+          </label>
+          <label>
+            院系
+            <input name="department" placeholder="计算机学院">
           </label>
           <p class="form-message" data-auth-message></p>
           <div class="button-row">
@@ -68,7 +83,7 @@
         <p>查看竞赛招募或科研申请入口。</p>
       </section>
 
-      <section class="panel action-panel">
+      <section class="panel action-panel" data-role-panel="student">
         <h2>发布组队招募</h2>
         <form data-recruit-form>
           <label>
@@ -91,7 +106,7 @@
         </form>
       </section>
 
-      <section class="panel action-panel">
+      <section class="panel action-panel" data-role-panel="student">
         <h2>申请科研项目</h2>
         <form data-research-apply-form>
           <label>
@@ -106,7 +121,7 @@
         </form>
       </section>
 
-      <section class="panel action-panel">
+      <section class="panel action-panel" data-role-panel="student">
         <h2>证书记录</h2>
         <form data-certificate-form>
           <label>
@@ -130,10 +145,47 @@
         <div class="stack" data-certificate-list></div>
       </section>
 
-      <section class="panel mentor-panel">
+      <section class="panel action-panel" data-role-panel="certificate_collector">
+        <p class="eyebrow">证书收集者</p>
+        <h2>证书汇总</h2>
+        <div class="stack" data-certificate-collection></div>
+      </section>
+
+      <section class="panel mentor-panel" data-role-panel="mentor">
         <p class="eyebrow">导师侧演示</p>
         <h2>科研申请队列</h2>
         <div class="stack" data-mentor-applications></div>
+      </section>
+
+      <section class="panel mentor-panel">
+        <p class="eyebrow">MVP 验证</p>
+        <h2>使用反馈</h2>
+        <form data-feedback-form>
+          <label>
+            联系方式
+            <input name="contact" required placeholder="邮箱 / QQ / 微信">
+          </label>
+          <label>
+            用户痛点
+            <input name="painPoint" required placeholder="找队友信息太分散">
+          </label>
+          <label>
+            评分
+            <select name="rating">
+              <option value="5">5</option>
+              <option value="4">4</option>
+              <option value="3">3</option>
+              <option value="2">2</option>
+              <option value="1">1</option>
+            </select>
+          </label>
+          <label>
+            反馈内容
+            <textarea name="message" required placeholder="写下这次试用哪里顺、哪里卡"></textarea>
+          </label>
+          <button type="submit">提交反馈</button>
+        </form>
+        <div class="stack" data-feedback-list></div>
       </section>
     </main>
 

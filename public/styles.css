@@ -32,6 +32,12 @@ body {
   background: #fff;
 }
 
+.session-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 h1,
 h2,
 h3,
@@ -273,10 +279,15 @@ dd {
 }
 
 @media (max-width: 900px) {
-  .topbar {
+.topbar {
     align-items: flex-start;
     flex-direction: column;
     padding: 20px;
+  }
+
+  .session-tools {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .layout {

@@ -20,6 +20,7 @@ export function createInitialState() {
         department: "计算机学院"
       }
     ],
+    certificateCollectors: [],
     competitions: [
       {
         id: "competition_1",
@@ -56,15 +57,22 @@ export function createInitialState() {
     ],
     teamRecruits: [],
     applications: [],
-    certificateRecords: []
+    certificateRecords: [],
+    usageEvents: [],
+    feedbackEntries: []
   };
 }
 
 export function registerStudent(state, payload) {
+  return registerUser(state, { ...payload, role: "student" });
+}
+
+export function registerUser(state, payload) {
   const next = cloneState(state);
   const name = requiredText(payload.name, "姓名");
   const email = normalizeEmail(payload.email);
   const password = requiredText(payload.password, "密码");
+  const role = normalizeRole(payload.role);
 
   if (password.length < 8) {
     throw new DomainError("密码至少需要 8 位", "WEAK_PASSWORD");
@@ -78,18 +86,34 @@ export function registerStudent(state, payload) {
     name,
     email,
     passwordHash: hashPassword(password),
-    role: "student",
+    role,
     status: "正常"
-  };
-  const student = {
-    id: nextId("student", next.students),
-    userId: user.id,
-    major: requiredText(payload.major, "专业"),
-    githubUrl: payload.githubUrl?.trim() ?? ""
   };
 
   next.users.push(user);
-  next.students.push(student);
+  if (role === "student") {
+    next.students.push({
+      id: nextId("student", next.students),
+      userId: user.id,
+      major: optionalText(payload.major, "未填写专业"),
+      githubUrl: payload.githubUrl?.trim() ?? ""
+    });
+  }
+  if (role === "mentor") {
+    next.mentors.push({
+      id: nextId("mentor", next.mentors),
+      userId: user.id,
+      name,
+      department: optionalText(payload.department, "待补充院系")
+    });
+  }
+  if (role === "certificate_collector") {
+    next.certificateCollectors.push({
+      id: nextId("collector", next.certificateCollectors),
+      userId: user.id,
+      name
+    });
+  }
 
   return {
     state: next,
@@ -299,10 +323,85 @@ export function listCertificateRecords(state, studentUserId) {
     .map((record) => presentCertificateRecord(state, record));
 }
 
+export function listCertificateCollection(state, collectorUserId) {
+  findCertificateCollectorByUserId(state, collectorUserId);
+  return certificateRecordsOf(state).map((record) => presentCertificateRecord(state, record));
+}
+
+export function recordUsage(state, payload) {
+  const next = cloneState(state);
+  const user = payload.userId ? findUserById(next, payload.userId) : null;
+  const usageEvent = {
+    id: nextId("usage", usageEventsOf(next)),
+    userId: user?.id ?? null,
+    action: requiredText(payload.action, "使用动作"),
+    target: `${payload.target ?? ""}`.trim(),
+    occurredAt: new Date().toISOString()
+  };
+
+  next.usageEvents = usageEventsOf(next);
+  next.usageEvents.push(usageEvent);
+
+  return {
+    state: next,
+    usageEvent
+  };
+}
+
+export function submitFeedback(state, payload) {
+  const next = cloneState(state);
+  const user = payload.userId ? findUserById(next, payload.userId) : null;
+  const rating = Number(payload.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new DomainError("评分需要在 1 到 5 之间", "INVALID_RATING");
+  }
+
+  const feedback = {
+    id: nextId("feedback", feedbackEntriesOf(next)),
+    userId: user?.id ?? null,
+    contact: requiredText(payload.contact, "联系方式"),
+    painPoint: requiredText(payload.painPoint, "用户痛点"),
+    message: requiredText(payload.message, "反馈内容"),
+    rating,
+    submittedAt: new Date().toISOString()
+  };
+
+  next.feedbackEntries = feedbackEntriesOf(next);
+  next.feedbackEntries.push(feedback);
+
+  return {
+    state: next,
+    feedback: presentFeedback(next, feedback)
+  };
+}
+
+export function listFeedbackEntries(state) {
+  return feedbackEntriesOf(state).map((feedback) => presentFeedback(state, feedback));
+}
+
 function cloneState(state) {
   return globalThis.structuredClone
     ? globalThis.structuredClone(state)
     : JSON.parse(JSON.stringify(state));
+}
+
+function findCertificateCollectorByUserId(state, userId) {
+  const user = state.users.find((candidate) => candidate.id === userId);
+  const collector = state.certificateCollectors.find(
+    (candidate) => candidate.userId === userId
+  );
+  if (!user || !collector || user.role !== "certificate_collector") {
+    throw new DomainError("只有证书收集者可以查看汇总", "CERTIFICATE_COLLECTOR_REQUIRED");
+  }
+  return collector;
+}
+
+function findUserById(state, userId) {
+  const user = state.users.find((candidate) => candidate.id === userId);
+  if (!user) {
+    throw new DomainError("用户不存在", "USER_NOT_FOUND");
+  }
+  return user;
 }
 
 function findStudentByUserId(state, userId) {
@@ -312,6 +411,38 @@ function findStudentByUserId(state, userId) {
     throw new DomainError("只有学生可以执行该操作", "STUDENT_REQUIRED");
   }
   return student;
+}
+
+function certificateRecordsOf(state) {
+  return state.certificateRecords ?? [];
+}
+
+function feedbackEntriesOf(state) {
+  return state.feedbackEntries ?? [];
+}
+
+function usageEventsOf(state) {
+  return state.usageEvents ?? [];
+}
+
+function formatBytes(bytes) {
+  const size = Number(bytes);
+  if (!Number.isFinite(size)) {
+    return "未知大小";
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function roleLabel(role) {
+  const labels = {
+    student: "学生",
+    mentor: "导师",
+    certificate_collector: "证书收集者"
+  };
+  return labels[role] ?? "未知身份";
 }
 
 function hashPassword(password) {
@@ -343,9 +474,31 @@ function presentCertificateRecord(state, certificateRecord) {
   const competition = state.competitions.find(
     (item) => item.id === certificateRecord.competitionId
   );
+  const student = state.students.find((candidate) => candidate.id === certificateRecord.studentId);
+  const user = state.users.find((candidate) => candidate.id === student?.userId);
+  const competitionTitle = competition?.title ?? "未知竞赛";
   return {
     ...certificateRecord,
-    competitionTitle: competition?.title ?? "未知竞赛"
+    competitionTitle,
+    uploaderName: user?.name ?? "未知上传者",
+    awardSummary: `${competitionTitle} · ${certificateRecord.awardLevel}`,
+    fileSummary: `${certificateRecord.fileName} · ${formatBytes(certificateRecord.fileSizeBytes)}`
+  };
+}
+
+function presentFeedback(state, feedback) {
+  const user = feedback.userId
+    ? state.users.find((candidate) => candidate.id === feedback.userId)
+    : null;
+  const usageCount = usageEventsOf(state).filter(
+    (event) => event.userId === feedback.userId
+  ).length;
+
+  return {
+    ...feedback,
+    userName: user?.name ?? "匿名用户",
+    roleLabel: roleLabel(user?.role),
+    usageCount
   };
 }
 
@@ -385,10 +538,24 @@ function publicUser(user) {
   return safeUser;
 }
 
+function normalizeRole(role) {
+  const normalized = `${role ?? "student"}`.trim();
+  const roles = new Set(["student", "mentor", "certificate_collector"]);
+  if (!roles.has(normalized)) {
+    throw new DomainError("权限身份不正确", "INVALID_ROLE");
+  }
+  return normalized;
+}
+
 function requiredText(value, label) {
   const text = `${value ?? ""}`.trim();
   if (!text) {
     throw new DomainError(`${label}不能为空`, "REQUIRED_FIELD");
   }
   return text;
+}
+
+function optionalText(value, fallback) {
+  const text = `${value ?? ""}`.trim();
+  return text || fallback;
 }

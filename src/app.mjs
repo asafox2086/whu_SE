@@ -4,11 +4,15 @@ import {
   createTeamRecruit,
   DomainError,
   getCompetitionDetail,
+  listCertificateCollection,
   listCertificateRecords,
+  listFeedbackEntries,
   listOpportunities,
   listResearchApplicationsForMentor,
   login,
-  registerStudent,
+  recordUsage,
+  registerUser,
+  submitFeedback,
   uploadCertificateRecord
 } from "./domain.mjs";
 
@@ -21,8 +25,10 @@ let selectedOpportunityType = "all";
 
 const selectors = {
   userBadge: document.querySelector("[data-user-badge]"),
+  logoutButton: document.querySelector("[data-logout]"),
   authForm: document.querySelector("[data-auth-form]"),
   authMessage: document.querySelector("[data-auth-message]"),
+  rolePanels: document.querySelectorAll("[data-role-panel]"),
   opportunityFilters: document.querySelector("[data-opportunity-filters]"),
   opportunityList: document.querySelector("[data-opportunity-list]"),
   detailPanel: document.querySelector("[data-detail-panel]"),
@@ -30,16 +36,21 @@ const selectors = {
   researchApplyForm: document.querySelector("[data-research-apply-form]"),
   certificateForm: document.querySelector("[data-certificate-form]"),
   certificateList: document.querySelector("[data-certificate-list]"),
+  certificateCollection: document.querySelector("[data-certificate-collection]"),
   mentorApplications: document.querySelector("[data-mentor-applications]"),
+  feedbackForm: document.querySelector("[data-feedback-form]"),
+  feedbackList: document.querySelector("[data-feedback-list]"),
   toast: document.querySelector("[data-toast]")
 };
 
 selectors.authForm.addEventListener("submit", handleAuthSubmit);
+selectors.logoutButton.addEventListener("click", handleLogout);
 selectors.opportunityFilters.addEventListener("click", handleOpportunityFilter);
 selectors.opportunityList.addEventListener("click", handleOpportunityClick);
 selectors.recruitForm.addEventListener("submit", handleRecruitSubmit);
 selectors.researchApplyForm.addEventListener("submit", handleResearchApplySubmit);
 selectors.certificateForm.addEventListener("submit", handleCertificateSubmit);
+selectors.feedbackForm.addEventListener("submit", handleFeedbackSubmit);
 
 render();
 
@@ -48,16 +59,18 @@ function handleAuthSubmit(event) {
   const form = new FormData(event.currentTarget);
   const mode = event.submitter?.value ?? "login";
   const credentials = {
+    role: form.get("role"),
     name: form.get("name"),
     email: form.get("email"),
     password: form.get("password"),
     major: form.get("major"),
-    githubUrl: form.get("githubUrl")
+    githubUrl: form.get("githubUrl"),
+    department: form.get("department")
   };
 
   try {
     if (mode === "register") {
-      const registered = registerStudent(state, credentials);
+      const registered = registerUser(state, credentials);
       state = registered.state;
       session = login(state, credentials);
       showToast("注册成功，已进入平台");
@@ -72,12 +85,20 @@ function handleAuthSubmit(event) {
   }
 }
 
+function handleLogout() {
+  session = null;
+  localStorage.removeItem(sessionKey);
+  showToast("已切换为未登录状态");
+  render();
+}
+
 function handleOpportunityFilter(event) {
   const button = event.target.closest("button[data-type]");
   if (!button) {
     return;
   }
   selectedOpportunityType = button.dataset.type;
+  trackUsage("filter_opportunities", selectedOpportunityType);
   renderOpportunities();
 }
 
@@ -87,6 +108,7 @@ function handleOpportunityClick(event) {
     return;
   }
   const { opportunityId, opportunityType } = button.dataset;
+  trackUsage("view_opportunity", opportunityId);
   renderOpportunityDetail(opportunityType, opportunityId);
 }
 
@@ -104,6 +126,7 @@ function handleRecruitSubmit(event) {
       contact: form.get("contact")
     });
     state = created.state;
+    trackUsage("publish_team_recruit", created.recruit.id);
     saveState();
     event.currentTarget.reset();
     showToast("组队招募已发布");
@@ -126,6 +149,7 @@ function handleResearchApplySubmit(event) {
       statement: form.get("statement")
     });
     state = applied.state;
+    trackUsage("apply_research", applied.application.id);
     saveState();
     event.currentTarget.reset();
     showToast("申请已提交，等待导师审核");
@@ -151,10 +175,34 @@ function handleCertificateSubmit(event) {
       fileSizeBytes: file?.size
     });
     state = uploaded.state;
+    trackUsage("upload_certificate_record", uploaded.certificateRecord.id);
     saveState();
     event.currentTarget.reset();
     showToast("证书记录已保存");
-    renderCertificates();
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleFeedbackSubmit(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+
+  try {
+    const submitted = submitFeedback(state, {
+      userId: session?.user.id,
+      contact: form.get("contact"),
+      painPoint: form.get("painPoint"),
+      message: form.get("message"),
+      rating: form.get("rating")
+    });
+    state = submitted.state;
+    trackUsage("submit_feedback", submitted.feedback.id);
+    saveState();
+    event.currentTarget.reset();
+    showToast("反馈已保存");
+    renderFeedback();
   } catch (error) {
     showToast(error.message, true);
   }
@@ -165,13 +213,19 @@ function render() {
   renderOpportunities();
   renderForms();
   renderCertificates();
+  renderCertificateCollection();
   renderMentorApplications();
+  renderFeedback();
 }
 
 function renderAuth() {
   selectors.userBadge.textContent = session
-    ? `${session.user.name} · 学生`
+    ? `${session.user.name} · ${roleLabel(session.user.role)}`
     : "未登录";
+  selectors.logoutButton.hidden = !session;
+  selectors.rolePanels.forEach((panel) => {
+    panel.hidden = !session || panel.dataset.rolePanel !== session.user.role;
+  });
   showInlineMessage(selectors.authMessage, null);
 }
 
@@ -272,7 +326,7 @@ function renderForms() {
 }
 
 function renderCertificates() {
-  if (!session) {
+  if (!session || session.user.role !== "student") {
     selectors.certificateList.innerHTML = `<p class="empty">登录后显示个人证书记录。</p>`;
     return;
   }
@@ -287,6 +341,28 @@ function renderCertificates() {
               <strong>${escapeHtml(record.competitionTitle)}</strong>
               <span>${escapeHtml(record.awardLevel)} · ${escapeHtml(record.awardDate)}</span>
               <small>${escapeHtml(record.fileName)}</small>
+            </section>
+          `
+        )
+        .join("");
+}
+
+function renderCertificateCollection() {
+  if (!session || session.user.role !== "certificate_collector") {
+    selectors.certificateCollection.innerHTML = `<p class="empty">切换为证书收集者后显示汇总。</p>`;
+    return;
+  }
+
+  const records = listCertificateCollection(state, session.user.id);
+  selectors.certificateCollection.innerHTML = records.length === 0
+    ? `<p class="empty">还没有证书记录。</p>`
+    : records
+        .map(
+          (record) => `
+            <section class="mini-card">
+              <strong>${escapeHtml(record.awardSummary)}</strong>
+              <span>${escapeHtml(record.uploaderName)} · ${escapeHtml(record.awardDate)}</span>
+              <small>${escapeHtml(record.fileSummary)}</small>
             </section>
           `
         )
@@ -310,9 +386,38 @@ function renderMentorApplications() {
         .join("");
 }
 
+function renderFeedback() {
+  const entries = listFeedbackEntries(state);
+  selectors.feedbackList.innerHTML = entries.length === 0
+    ? `<p class="empty">暂无反馈记录。</p>`
+    : entries
+        .map(
+          (entry) => `
+            <section class="mini-card">
+              <strong>${escapeHtml(entry.userName)} · ${escapeHtml(entry.roleLabel)} · ${entry.rating}/5</strong>
+              <span>${escapeHtml(entry.painPoint)} · 使用 ${entry.usageCount} 次</span>
+              <small>${escapeHtml(entry.message)}</small>
+            </section>
+          `
+        )
+        .join("");
+}
+
 function loadState() {
   const stored = localStorage.getItem(storageKey);
-  return stored ? JSON.parse(stored) : createInitialState();
+  if (!stored) {
+    return createInitialState();
+  }
+
+  const defaults = createInitialState();
+  const parsed = JSON.parse(stored);
+  return {
+    ...defaults,
+    ...parsed,
+    certificateCollectors: parsed.certificateCollectors ?? [],
+    usageEvents: parsed.usageEvents ?? [],
+    feedbackEntries: parsed.feedbackEntries ?? []
+  };
 }
 
 function loadSession() {
@@ -327,6 +432,19 @@ function saveAll() {
 
 function saveState() {
   localStorage.setItem(storageKey, JSON.stringify(state));
+}
+
+function trackUsage(action, target = "") {
+  try {
+    const recorded = recordUsage(state, {
+      userId: session?.user.id,
+      action,
+      target
+    });
+    state = recorded.state;
+  } catch {
+    // Usage collection should never block the MVP workflow.
+  }
 }
 
 function requireSession() {
@@ -347,6 +465,15 @@ function showToast(message, isError = false) {
   showToast.timer = setTimeout(() => {
     selectors.toast.hidden = true;
   }, 2600);
+}
+
+function roleLabel(role) {
+  const labels = {
+    student: "学生",
+    mentor: "导师",
+    certificate_collector: "证书收集者"
+  };
+  return labels[role] ?? "未知身份";
 }
 
 function escapeHtml(value) {
