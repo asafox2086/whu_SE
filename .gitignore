@@ -1,1 +1,4 @@
 SE-report/
+.agents/
+temp-skills/
+skills-lock.json

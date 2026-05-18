@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>星轨平台 MVP</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">星轨平台 MVP</p>
+        <h1>校园竞赛与科研机会工作台</h1>
+      </div>
+      <span class="user-badge" data-user-badge>未登录</span>
+    </header>
+
+    <main class="layout">
+      <section class="panel auth-panel">
+        <h2>学生入口</h2>
+        <form data-auth-form>
+          <label>
+            姓名
+            <input name="name" autocomplete="name" placeholder="陈星">
+          </label>
+          <label>
+            邮箱
+            <input name="email" type="email" autocomplete="email" required placeholder="chenxing@whu.edu.cn">
+          </label>
+          <label>
+            密码
+            <input name="password" type="password" autocomplete="current-password" required placeholder="至少 8 位">
+          </label>
+          <label>
+            专业
+            <input name="major" placeholder="软件工程">
+          </label>
+          <label>
+            GitHub
+            <input name="githubUrl" placeholder="https://github.com/you">
+          </label>
+          <p class="form-message" data-auth-message></p>
+          <div class="button-row">
+            <button name="mode" value="login" type="submit">登录</button>
+            <button name="mode" value="register" type="submit" class="secondary">注册并进入</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel opportunities">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">机会大厅</p>
+            <h2>竞赛与科研项目</h2>
+          </div>
+          <div class="segmented" data-opportunity-filters>
+            <button class="is-active" data-type="all">全部</button>
+            <button data-type="competition">竞赛</button>
+            <button data-type="research">科研</button>
+          </div>
+        </div>
+        <div class="card-grid" data-opportunity-list></div>
+      </section>
+
+      <section class="panel detail-panel" data-detail-panel>
+        <p class="eyebrow">详情</p>
+        <h2>选择一个机会</h2>
+        <p>查看竞赛招募或科研申请入口。</p>
+      </section>
+
+      <section class="panel action-panel">
+        <h2>发布组队招募</h2>
+        <form data-recruit-form>
+          <label>
+            竞赛
+            <select name="competitionId"></select>
+          </label>
+          <label>
+            标题
+            <input name="title" required placeholder="寻找前端和答辩同学">
+          </label>
+          <label>
+            技能标签
+            <input name="skills" required placeholder="Vue, PPT, 产品设计">
+          </label>
+          <label>
+            联系方式
+            <input name="contact" required placeholder="QQ 123456789">
+          </label>
+          <button type="submit">发布招募</button>
+        </form>
+      </section>
+
+      <section class="panel action-panel">
+        <h2>申请科研项目</h2>
+        <form data-research-apply-form>
+          <label>
+            科研项目
+            <select name="researchId"></select>
+          </label>
+          <label>
+            个人陈述
+            <textarea name="statement" required placeholder="写下你的相关经历和可投入时间"></textarea>
+          </label>
+          <button type="submit">提交申请</button>
+        </form>
+      </section>
+
+      <section class="panel action-panel">
+        <h2>证书记录</h2>
+        <form data-certificate-form>
+          <label>
+            关联竞赛
+            <select name="competitionId"></select>
+          </label>
+          <label>
+            奖项等级
+            <input name="awardLevel" required placeholder="二等奖">
+          </label>
+          <label>
+            获奖时间
+            <input name="awardDate" type="date" required>
+          </label>
+          <label>
+            证书文件
+            <input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png" required>
+          </label>
+          <button type="submit">保存记录</button>
+        </form>
+        <div class="stack" data-certificate-list></div>
+      </section>
+
+      <section class="panel mentor-panel">
+        <p class="eyebrow">导师侧演示</p>
+        <h2>科研申请队列</h2>
+        <div class="stack" data-mentor-applications></div>
+      </section>
+    </main>
+
+    <aside class="toast" data-toast hidden></aside>
+    <script type="module" src="../src/app.mjs"></script>
+  </body>
+</html>
