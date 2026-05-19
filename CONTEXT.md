@@ -65,7 +65,8 @@ _Avoid_: 用户（讨论业务行为时过宽）
 - A **学生** can submit zero or more **申请**.
 - An **申请** targets exactly one **组队招募** or one **科研项目**.
 - A **学生** can own zero or more **证书记录**.
-- A **证书收集者** can view many **证书记录**.
+- A **学生** can delete their own **申请** and **证书记录**.
+- A **证书收集者** can view, download, and export many **证书记录** grouped by **竞赛**.
 - A **使用反馈** can be linked to a **学生**, **导师**, or **证书收集者**.
 - An **管理员** can inspect a **数据库快照** and delete selected test records.
 - A **本地数据库文件** stores the current MVP state when the local service is running.

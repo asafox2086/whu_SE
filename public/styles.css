@@ -238,9 +238,51 @@ button.secondary {
   align-items: start;
 }
 
+.record-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
 .review-form {
   border-top: 1px solid var(--line);
   padding-top: 12px;
+}
+
+.collection-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 12px;
+}
+
+.collection-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.collection-group summary small {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.collection-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0;
+}
+
+.collection-group:not([open]) .collection-tools {
+  display: none;
+}
+
+.collection-group:not([open]) .stack {
+  display: none;
 }
 
 .certificate-panel {
@@ -419,7 +461,8 @@ dd {
     grid-template-columns: 1fr;
   }
 
-  .project-row {
+  .project-row,
+  .record-head {
     grid-template-columns: 1fr;
   }
 }

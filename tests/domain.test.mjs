@@ -7,7 +7,9 @@ import {
   createTeamRecruit,
   createInitialState,
   createResearchProject,
+  deleteCertificateRecord,
   deleteResearchProject,
+  deleteResearchApplication,
   deleteDatabaseRecord,
   getAdminDatabaseView,
   getDatabaseSnapshot,
@@ -15,6 +17,7 @@ import {
   listRegisteredUsers,
   listCertificateRecords,
   listCertificateCollection,
+  listCertificateCollectionByCompetition,
   listResearchApplicationsForMentor,
   listResearchApplicationsForStudent,
   listResearchProjectsForMentor,
@@ -334,6 +337,106 @@ test("mentor can approve or reject research applications with student-facing res
   assert.equal(rejectedApplications[0].status, "未通过");
   assert.equal(rejectedApplications[0].mentorContact, "");
   assert.equal(rejectedApplications[0].mentorFeedback, "本轮需要有课程项目或检索经验，可以下轮再投。");
+});
+
+test("student can delete their own research application", () => {
+  const registered = registerStudent(createInitialState(), {
+    name: "撤回同学",
+    email: "delete-application@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const applied = applyToResearchProject(registered.state, {
+    researchId: "research_1",
+    studentUserId: registered.user.id,
+    statement: "我想先提交，之后可能调整。"
+  });
+
+  const deleted = deleteResearchApplication(
+    applied.state,
+    registered.user.id,
+    applied.application.id
+  );
+
+  assert.equal(listResearchApplicationsForStudent(deleted.state, registered.user.id).length, 0);
+  assert.equal(listResearchApplicationsForMentor(deleted.state, "mentor_1").length, 0);
+});
+
+test("student can delete their own uploaded certificate record", () => {
+  const student = registerStudent(createInitialState(), {
+    name: "证书同学",
+    email: "delete-certificate@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const uploaded = uploadCertificateRecord(student.state, {
+    studentUserId: student.user.id,
+    competitionId: "competition_1",
+    awardLevel: "一等奖",
+    awardDate: "2026-05-08",
+    fileName: "award.pdf",
+    fileSizeBytes: 128 * 1024,
+    fileDataUrl: "data:application/pdf;base64,JVBERi0x"
+  });
+
+  const deleted = deleteCertificateRecord(
+    uploaded.state,
+    student.user.id,
+    uploaded.certificateRecord.id
+  );
+
+  assert.equal(listCertificateRecords(deleted.state, student.user.id).length, 0);
+});
+
+test("certificate collector can review certificates grouped by competition with downloadable archive names", () => {
+  const firstStudent = registerStudent(createInitialState(), {
+    name: "赵同学",
+    email: "zhao-download@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "信息安全"
+  });
+  const firstUploaded = uploadCertificateRecord(firstStudent.state, {
+    studentUserId: firstStudent.user.id,
+    competitionId: "competition_1",
+    awardLevel: "二等奖",
+    awardDate: "2026-05-01",
+    fileName: "zhao-award.pdf",
+    fileSizeBytes: 2 * 1024,
+    fileDataUrl: "data:application/pdf;base64,emhhbw=="
+  });
+  const secondStudent = registerStudent(firstUploaded.state, {
+    name: "钱同学",
+    email: "qian-download@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const secondUploaded = uploadCertificateRecord(secondStudent.state, {
+    studentUserId: secondStudent.user.id,
+    competitionId: "competition_1",
+    awardLevel: "三等奖",
+    awardDate: "2026-05-02",
+    fileName: "qian-award.jpg",
+    fileSizeBytes: 1024,
+    fileDataUrl: "data:image/jpeg;base64,cWlhbg=="
+  });
+  const collector = registerUser(secondUploaded.state, {
+    role: "certificate_collector",
+    name: "材料收集者",
+    email: "collector-download@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+
+  const groups = listCertificateCollectionByCompetition(collector.state, collector.user.id);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].competitionTitle, "中国大学生服务外包创新创业大赛");
+  assert.equal(groups[0].records.length, 2);
+  assert.equal(groups[0].archiveName, "中国大学生服务外包创新创业大赛-证书合集.zip");
+  assert.deepEqual(
+    groups[0].records.map((record) => record.archiveFileName),
+    ["赵同学.pdf", "钱同学.jpg"]
+  );
+  assert.equal(groups[0].records[0].downloadUrl, "data:application/pdf;base64,emhhbw==");
 });
 
 test("student can browse opportunities across competitions and research projects", () => {

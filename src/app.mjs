@@ -4,12 +4,15 @@ import {
   createInitialState,
   createResearchProject,
   createTeamRecruit,
+  deleteCertificateRecord,
+  deleteResearchApplication,
   deleteResearchProject,
   deleteDatabaseRecord,
   DomainError,
   getAdminDatabaseView,
   getCompetitionDetail,
   listCertificateCollection,
+  listCertificateCollectionByCompetition,
   listCertificateRecords,
   listFeedbackEntries,
   listOpportunities,
@@ -67,7 +70,10 @@ selectors.opportunityFilters.addEventListener("click", handleOpportunityFilter);
 selectors.opportunityList.addEventListener("click", handleOpportunityClick);
 selectors.recruitForm.addEventListener("submit", handleRecruitSubmit);
 selectors.researchApplyForm.addEventListener("submit", handleResearchApplySubmit);
+selectors.studentApplications.addEventListener("click", handleStudentApplicationsClick);
 selectors.certificateForm.addEventListener("submit", handleCertificateSubmit);
+selectors.certificateList.addEventListener("click", handleCertificateListClick);
+selectors.certificateCollection.addEventListener("click", handleCertificateCollectionClick);
 selectors.feedbackForm.addEventListener("submit", handleFeedbackSubmit);
 selectors.adminDatabase.addEventListener("click", handleAdminDatabaseClick);
 selectors.adminCompetitionForm.addEventListener("submit", handleAdminCompetitionSubmit);
@@ -184,6 +190,25 @@ function handleResearchApplySubmit(event) {
   }
 }
 
+function handleStudentApplicationsClick(event) {
+  const button = event.target.closest("button[data-delete-application-id]");
+  if (!button) {
+    return;
+  }
+
+  try {
+    requireSession();
+    const deleted = deleteResearchApplication(state, session.user.id, button.dataset.deleteApplicationId);
+    state = deleted.state;
+    trackUsage("delete_research_application", button.dataset.deleteApplicationId);
+    saveState();
+    showToast("申请已删除");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
 async function handleCertificateSubmit(event) {
   event.preventDefault();
   const formElement = event.currentTarget;
@@ -208,6 +233,71 @@ async function handleCertificateSubmit(event) {
     formElement.reset();
     showToast("证书记录已保存");
     render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleCertificateListClick(event) {
+  const button = event.target.closest("button[data-delete-certificate-id]");
+  if (!button) {
+    return;
+  }
+
+  try {
+    requireSession();
+    const deleted = deleteCertificateRecord(state, session.user.id, button.dataset.deleteCertificateId);
+    state = deleted.state;
+    trackUsage("delete_certificate_record", button.dataset.deleteCertificateId);
+    saveState();
+    showToast("证书记录已删除");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+async function handleCertificateCollectionClick(event) {
+  const downloadButton = event.target.closest("button[data-download-certificate-id]");
+  if (downloadButton) {
+    const record = findCollectorCertificateRecord(downloadButton.dataset.downloadCertificateId);
+    if (!record) {
+      showToast("证书记录不存在", true);
+      return;
+    }
+    if (!record.downloadUrl) {
+      showToast("这条证书没有可下载文件", true);
+      return;
+    }
+    downloadDataUrl(record.downloadUrl, record.archiveFileName);
+    trackUsage("download_certificate_record", record.id);
+    saveState();
+    return;
+  }
+
+  const exportButton = event.target.closest("button[data-export-competition-id]");
+  if (!exportButton) {
+    return;
+  }
+
+  try {
+    const group = findCollectorCertificateGroup(exportButton.dataset.exportCompetitionId);
+    if (!group) {
+      throw new DomainError("证书合集不存在", "CERTIFICATE_GROUP_NOT_FOUND");
+    }
+    const entries = group.records
+      .filter((record) => record.downloadUrl)
+      .map((record) => ({
+        path: record.archiveFileName,
+        dataUrl: record.downloadUrl
+      }));
+    if (entries.length === 0) {
+      throw new DomainError("这个比赛还没有可导出的证书文件", "NO_DOWNLOADABLE_CERTIFICATES");
+    }
+    const zipBlob = await createZipBlob(entries);
+    downloadBlob(zipBlob, group.archiveName);
+    trackUsage("export_certificate_archive", group.competitionId);
+    saveState();
   } catch (error) {
     showToast(error.message, true);
   }
@@ -513,8 +603,13 @@ function renderStudentApplications() {
         .map(
           (application) => `
             <section class="mini-card">
-              <strong>${escapeHtml(application.researchTitle)} · ${escapeHtml(application.status)}</strong>
-              <span>${escapeHtml(application.statement)}</span>
+              <div class="record-head">
+                <div>
+                  <strong>${escapeHtml(application.researchTitle)} · ${escapeHtml(application.status)}</strong>
+                  <span>${escapeHtml(application.statement)}</span>
+                </div>
+                <button class="secondary" data-delete-application-id="${escapeHtml(application.id)}">删除</button>
+              </div>
               ${application.status === "已通过"
                 ? `<small>后续联系：${escapeHtml(application.mentorContact)}</small>`
                 : ""}
@@ -544,9 +639,14 @@ function renderCertificates() {
           (record) => `
             <section class="mini-card">
               ${renderCertificatePreview(record)}
-              <strong>${escapeHtml(record.competitionTitle)}</strong>
-              <span>${escapeHtml(record.awardLevel)} · ${escapeHtml(record.awardDate)}</span>
-              <small>${escapeHtml(record.fileSummary)}</small>
+              <div class="record-head">
+                <div>
+                  <strong>${escapeHtml(record.competitionTitle)}</strong>
+                  <span>${escapeHtml(record.awardLevel)} · ${escapeHtml(record.awardDate)}</span>
+                  <small>${escapeHtml(record.fileSummary)}</small>
+                </div>
+                <button class="secondary" data-delete-certificate-id="${escapeHtml(record.id)}">删除</button>
+              </div>
             </section>
           `
         )
@@ -559,18 +659,40 @@ function renderCertificateCollection() {
     return;
   }
 
-  const records = listCertificateCollection(state, session.user.id);
-  selectors.certificateCollection.innerHTML = records.length === 0
+  const groups = listCertificateCollectionByCompetition(state, session.user.id);
+  selectors.certificateCollection.innerHTML = groups.length === 0
     ? `<p class="empty">还没有证书记录。</p>`
-    : records
+    : groups
         .map(
-          (record) => `
-            <section class="mini-card">
-              ${renderCertificatePreview(record)}
-              <strong>${escapeHtml(record.awardSummary)}</strong>
-              <span>${escapeHtml(record.uploaderName)} · ${escapeHtml(record.awardDate)}</span>
-              <small>${escapeHtml(record.fileSummary)}</small>
-            </section>
+          (group) => `
+            <details class="collection-group">
+              <summary>
+                <span>${escapeHtml(group.competitionTitle)}</span>
+                <small>${group.records.length} 份证书</small>
+              </summary>
+              <div class="collection-tools">
+                <button data-export-competition-id="${escapeHtml(group.competitionId)}">导出合集</button>
+              </div>
+              <div class="stack">
+                ${group.records
+                  .map(
+                    (record) => `
+                      <section class="mini-card">
+                        ${renderCertificatePreview(record)}
+                        <div class="record-head">
+                          <div>
+                            <strong>${escapeHtml(record.awardSummary)}</strong>
+                            <span>${escapeHtml(record.uploaderName)} · ${escapeHtml(record.awardDate)}</span>
+                            <small>${escapeHtml(record.fileSummary)}</small>
+                          </div>
+                          <button class="secondary" data-download-certificate-id="${escapeHtml(record.id)}">下载</button>
+                        </div>
+                      </section>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </details>
           `
         )
         .join("");
@@ -730,6 +852,23 @@ function renderCertificatePreview(record) {
   return `<div class="certificate-preview is-placeholder">暂无图片预览</div>`;
 }
 
+function findCollectorCertificateGroup(competitionId) {
+  if (!session || session.user.role !== "certificate_collector") {
+    return null;
+  }
+  return listCertificateCollectionByCompetition(state, session.user.id)
+    .find((group) => group.competitionId === competitionId);
+}
+
+function findCollectorCertificateRecord(certificateRecordId) {
+  if (!session || session.user.role !== "certificate_collector") {
+    return null;
+  }
+  return listCertificateCollectionByCompetition(state, session.user.id)
+    .flatMap((group) => group.records)
+    .find((record) => record.id === certificateRecordId);
+}
+
 function loadState() {
   const stored = localStorage.getItem(storageKey);
   if (!stored) {
@@ -816,7 +955,7 @@ async function persistStateToServer(snapshot) {
 }
 
 function readFileDataUrl(file) {
-  if (!file || !/^image\//.test(file.type)) {
+  if (!file) {
     return Promise.resolve("");
   }
 
@@ -826,6 +965,144 @@ function readFileDataUrl(file) {
     reader.addEventListener("error", () => reject(reader.error));
     reader.readAsDataURL(file);
   });
+}
+
+function downloadDataUrl(dataUrl, fileName) {
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = fileName;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+function downloadBlob(blob, fileName) {
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    downloadDataUrl(objectUrl, fileName);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+}
+
+async function createZipBlob(entries) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const fileNameBytes = new TextEncoder().encode(entry.path);
+    const fileBytes = dataUrlToBytes(entry.dataUrl);
+    const crc = crc32(fileBytes);
+    const localHeader = concatBytes(
+      uint32(0x04034b50),
+      uint16(20),
+      uint16(0x0800),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint32(crc),
+      uint32(fileBytes.length),
+      uint32(fileBytes.length),
+      uint16(fileNameBytes.length),
+      uint16(0),
+      fileNameBytes
+    );
+    const centralHeader = concatBytes(
+      uint32(0x02014b50),
+      uint16(20),
+      uint16(20),
+      uint16(0x0800),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint32(crc),
+      uint32(fileBytes.length),
+      uint32(fileBytes.length),
+      uint16(fileNameBytes.length),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint32(0),
+      uint32(offset),
+      fileNameBytes
+    );
+    localParts.push(localHeader, fileBytes);
+    centralParts.push(centralHeader);
+    offset += localHeader.length + fileBytes.length;
+  }
+
+  const centralDirectory = concatBytes(...centralParts);
+  const endRecord = concatBytes(
+    uint32(0x06054b50),
+    uint16(0),
+    uint16(0),
+    uint16(entries.length),
+    uint16(entries.length),
+    uint32(centralDirectory.length),
+    uint32(offset),
+    uint16(0)
+  );
+
+  return new Blob([...localParts, centralDirectory, endRecord], {
+    type: "application/zip"
+  });
+}
+
+function dataUrlToBytes(dataUrl) {
+  const commaIndex = dataUrl.indexOf(",");
+  if (commaIndex === -1) {
+    return new TextEncoder().encode(dataUrl);
+  }
+
+  const metadata = dataUrl.slice(0, commaIndex);
+  const payload = dataUrl.slice(commaIndex + 1);
+  if (metadata.includes(";base64")) {
+    const binary = atob(payload);
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  }
+  return new TextEncoder().encode(decodeURIComponent(payload));
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = (crc >>> 8) ^ crc32.table[(crc ^ byte) & 0xff];
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+crc32.table = Array.from({ length: 256 }, (_, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) {
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  }
+  return value >>> 0;
+});
+
+function uint16(value) {
+  const bytes = new Uint8Array(2);
+  new DataView(bytes.buffer).setUint16(0, value, true);
+  return bytes;
+}
+
+function uint32(value) {
+  const bytes = new Uint8Array(4);
+  new DataView(bytes.buffer).setUint32(0, value >>> 0, true);
+  return bytes;
+}
+
+function concatBytes(...parts) {
+  const length = parts.reduce((sum, part) => sum + part.length, 0);
+  const combined = new Uint8Array(length);
+  let offset = 0;
+  for (const part of parts) {
+    combined.set(part, offset);
+    offset += part.length;
+  }
+  return combined;
 }
 
 function trackUsage(action, target = "") {

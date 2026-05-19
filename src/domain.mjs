@@ -372,6 +372,24 @@ export function listResearchApplicationsForStudent(state, studentUserId) {
     .map((application) => presentApplication(state, application));
 }
 
+export function deleteResearchApplication(state, studentUserId, applicationId) {
+  const student = findStudentByUserId(state, studentUserId);
+  const next = cloneState(state);
+  const application = next.applications.find((item) => item.id === applicationId);
+  if (!application) {
+    throw new DomainError("申请不存在", "APPLICATION_NOT_FOUND");
+  }
+  if (application.studentId !== student.id) {
+    throw new DomainError("只能删除自己的申请", "STUDENT_APPLICATION_FORBIDDEN");
+  }
+
+  next.applications = next.applications.filter((item) => item.id !== applicationId);
+
+  return {
+    state: next
+  };
+}
+
 export function reviewResearchApplication(state, mentorUserId, payload) {
   const mentor = findMentorByUserId(state, mentorUserId);
   const next = cloneState(state);
@@ -437,6 +455,7 @@ export function uploadCertificateRecord(state, payload) {
     fileUrl: `/uploads/certificates/${encodeURIComponent(fileName)}`,
     fileName,
     fileSizeBytes,
+    downloadUrl: optionalText(payload.fileDataUrl, ""),
     previewUrl: isImageFile(fileName) ? optionalText(payload.fileDataUrl, "") : "",
     hasPreview: isImageFile(fileName) && Boolean(`${payload.fileDataUrl ?? ""}`.trim()),
     status: "完成"
@@ -457,9 +476,49 @@ export function listCertificateRecords(state, studentUserId) {
     .map((record) => presentCertificateRecord(state, record));
 }
 
+export function deleteCertificateRecord(state, studentUserId, certificateRecordId) {
+  const student = findStudentByUserId(state, studentUserId);
+  const next = cloneState(state);
+  const certificateRecord = certificateRecordsOf(next).find((record) => record.id === certificateRecordId);
+  if (!certificateRecord) {
+    throw new DomainError("证书记录不存在", "CERTIFICATE_RECORD_NOT_FOUND");
+  }
+  if (certificateRecord.studentId !== student.id) {
+    throw new DomainError("只能删除自己的证书记录", "STUDENT_CERTIFICATE_FORBIDDEN");
+  }
+
+  next.certificateRecords = certificateRecordsOf(next).filter((record) => record.id !== certificateRecordId);
+
+  return {
+    state: next
+  };
+}
+
 export function listCertificateCollection(state, collectorUserId) {
   findCertificateCollectorByUserId(state, collectorUserId);
   return certificateRecordsOf(state).map((record) => presentCertificateRecord(state, record));
+}
+
+export function listCertificateCollectionByCompetition(state, collectorUserId) {
+  findCertificateCollectorByUserId(state, collectorUserId);
+  const groups = new Map();
+  for (const record of certificateRecordsOf(state)) {
+    const presented = presentCertificateRecord(state, record);
+    if (!groups.has(record.competitionId)) {
+      groups.set(record.competitionId, {
+        competitionId: record.competitionId,
+        competitionTitle: presented.competitionTitle,
+        archiveName: `${sanitizeFileNameSegment(presented.competitionTitle)}-证书合集.zip`,
+        records: []
+      });
+    }
+    groups.get(record.competitionId).records.push(presented);
+  }
+
+  return [...groups.values()].map((group) => ({
+    ...group,
+    records: withArchiveFileNames(group.records)
+  }));
 }
 
 export function recordUsage(state, payload) {
@@ -785,6 +844,11 @@ function isImageFile(fileName) {
   return /\.(jpg|jpeg|png)$/i.test(fileName);
 }
 
+function fileExtension(fileName) {
+  const extension = `${fileName ?? ""}`.split(".").pop()?.trim();
+  return extension ? extension.toLowerCase() : "dat";
+}
+
 function roleLabel(role) {
   const labels = {
     student: "学生",
@@ -856,6 +920,29 @@ function readableRecord(id, title, summary, fields, canDelete = false) {
   };
 }
 
+function withArchiveFileNames(records) {
+  const usedNames = new Map();
+  return records.map((record) => {
+    const stem = sanitizeFileNameSegment(record.uploaderName);
+    const extension = fileExtension(record.fileName);
+    const currentCount = usedNames.get(stem) ?? 0;
+    usedNames.set(stem, currentCount + 1);
+    const suffix = currentCount === 0 ? "" : `-${currentCount + 1}`;
+    return {
+      ...record,
+      archiveFileName: `${stem}${suffix}.${extension}`
+    };
+  });
+}
+
+function sanitizeFileNameSegment(value) {
+  return `${value ?? ""}`
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    || "未命名";
+}
+
 function presentUsageEvent(state, usageEvent) {
   const user = usageEvent.userId
     ? state.users.find((candidate) => candidate.id === usageEvent.userId)
@@ -874,7 +961,11 @@ function usageActionLabel(action) {
     filter_opportunities: "筛选机会",
     publish_team_recruit: "发布组队招募",
     apply_research: "提交科研申请",
+    delete_research_application: "删除科研申请",
     upload_certificate_record: "上传证书记录",
+    delete_certificate_record: "删除证书记录",
+    download_certificate_record: "下载证书记录",
+    export_certificate_archive: "导出证书合集",
     submit_feedback: "提交反馈",
     create_competition: "新增竞赛",
     create_research_project: "新增科研项目",
@@ -971,7 +1062,9 @@ function presentCertificateRecord(state, certificateRecord) {
     competitionTitle,
     uploaderName: user?.name ?? "未知上传者",
     awardSummary: `${competitionTitle} · ${certificateRecord.awardLevel}`,
-    fileSummary: `${certificateRecord.fileName} · ${formatBytes(certificateRecord.fileSizeBytes)}`
+    fileSummary: `${certificateRecord.fileName} · ${formatBytes(certificateRecord.fileSizeBytes)}`,
+    downloadUrl: certificateRecord.downloadUrl ?? certificateRecord.previewUrl ?? "",
+    archiveFileName: `${sanitizeFileNameSegment(user?.name ?? "未知上传者")}.${fileExtension(certificateRecord.fileName)}`
   };
 }
 
