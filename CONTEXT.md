@@ -61,6 +61,7 @@ _Avoid_: 用户（讨论业务行为时过宽）
 - A **竞赛** can have zero or more **组队招募**.
 - A **学生** can publish zero or more **组队招募**.
 - A **科研项目** belongs to exactly one **导师**.
+- A **导师** can create, delete, and review applications for their own **科研项目**.
 - A **学生** can submit zero or more **申请**.
 - An **申请** targets exactly one **组队招募** or one **科研项目**.
 - A **学生** can own zero or more **证书记录**.

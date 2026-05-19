@@ -4,6 +4,7 @@ import {
   createInitialState,
   createResearchProject,
   createTeamRecruit,
+  deleteResearchProject,
   deleteDatabaseRecord,
   DomainError,
   getAdminDatabaseView,
@@ -14,9 +15,12 @@ import {
   listOpportunities,
   listRegisteredUsers,
   listResearchApplicationsForMentor,
+  listResearchApplicationsForStudent,
+  listResearchProjectsForMentor,
   login,
   recordUsage,
   registerUser,
+  reviewResearchApplication,
   submitFeedback,
   uploadCertificateRecord
 } from "./domain.mjs";
@@ -41,6 +45,7 @@ const selectors = {
   detailPanel: document.querySelector("[data-detail-panel]"),
   recruitForm: document.querySelector("[data-recruit-form]"),
   researchApplyForm: document.querySelector("[data-research-apply-form]"),
+  studentApplications: document.querySelector("[data-student-applications]"),
   certificateForm: document.querySelector("[data-certificate-form]"),
   certificateList: document.querySelector("[data-certificate-list]"),
   certificateCollection: document.querySelector("[data-certificate-collection]"),
@@ -48,6 +53,8 @@ const selectors = {
   adminDatabase: document.querySelector("[data-admin-database]"),
   adminCompetitionForm: document.querySelector("[data-admin-competition-form]"),
   adminResearchForm: document.querySelector("[data-admin-research-form]"),
+  mentorResearchForm: document.querySelector("[data-mentor-research-form]"),
+  mentorProjects: document.querySelector("[data-mentor-projects]"),
   mentorApplications: document.querySelector("[data-mentor-applications]"),
   feedbackForm: document.querySelector("[data-feedback-form]"),
   feedbackList: document.querySelector("[data-feedback-list]"),
@@ -65,6 +72,9 @@ selectors.feedbackForm.addEventListener("submit", handleFeedbackSubmit);
 selectors.adminDatabase.addEventListener("click", handleAdminDatabaseClick);
 selectors.adminCompetitionForm.addEventListener("submit", handleAdminCompetitionSubmit);
 selectors.adminResearchForm.addEventListener("submit", handleAdminResearchSubmit);
+selectors.mentorResearchForm.addEventListener("submit", handleMentorResearchSubmit);
+selectors.mentorProjects.addEventListener("click", handleMentorProjectsClick);
+selectors.mentorApplications.addEventListener("submit", handleMentorApplicationReviewSubmit);
 
 render();
 hydrateStateFromServer();
@@ -276,6 +286,77 @@ function handleAdminResearchSubmit(event) {
   }
 }
 
+function handleMentorResearchSubmit(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+
+  try {
+    requireSession();
+    const created = createResearchProject(state, session.user.id, {
+      title: form.get("title"),
+      direction: form.get("direction"),
+      techStack: form.get("techStack"),
+      qqGroup: form.get("qqGroup"),
+      description: form.get("description"),
+      status: form.get("status")
+    });
+    state = created.state;
+    trackUsage("create_research_project", created.researchProject.id);
+    saveState();
+    event.currentTarget.reset();
+    showToast("科研项目已发布");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleMentorProjectsClick(event) {
+  const button = event.target.closest("button[data-delete-research-id]");
+  if (!button) {
+    return;
+  }
+
+  try {
+    requireSession();
+    const deleted = deleteResearchProject(state, session.user.id, button.dataset.deleteResearchId);
+    state = deleted.state;
+    trackUsage("delete_research_project", button.dataset.deleteResearchId);
+    saveState();
+    showToast("科研项目已删除");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleMentorApplicationReviewSubmit(event) {
+  event.preventDefault();
+  const formElement = event.target.closest("form[data-application-review-form]");
+  if (!formElement) {
+    return;
+  }
+  const form = new FormData(formElement);
+  const decision = event.submitter?.value;
+
+  try {
+    requireSession();
+    const reviewed = reviewResearchApplication(state, session.user.id, {
+      applicationId: formElement.dataset.applicationId,
+      decision,
+      contact: form.get("contact"),
+      feedback: form.get("feedback")
+    });
+    state = reviewed.state;
+    trackUsage("review_research_application", reviewed.application.id);
+    saveState();
+    showToast(reviewed.application.status === "已通过" ? "申请已通过" : "申请已标记未通过");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
 function handleFeedbackSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -303,9 +384,11 @@ function render() {
   renderAuth();
   renderOpportunities();
   renderForms();
+  renderStudentApplications();
   renderCertificates();
   renderCertificateCollection();
   renderAdmin();
+  renderMentorProjects();
   renderMentorApplications();
   renderFeedback();
 }
@@ -417,6 +500,36 @@ function renderForms() {
   selectors.certificateForm.elements.competitionId.innerHTML = competitionOptions;
 }
 
+function renderStudentApplications() {
+  if (!session || session.user.role !== "student") {
+    selectors.studentApplications.innerHTML = `<p class="empty">登录后显示你的科研申请结果。</p>`;
+    return;
+  }
+
+  const applications = listResearchApplicationsForStudent(state, session.user.id);
+  selectors.studentApplications.innerHTML = applications.length === 0
+    ? `<p class="empty">还没有科研申请记录。</p>`
+    : applications
+        .map(
+          (application) => `
+            <section class="mini-card">
+              <strong>${escapeHtml(application.researchTitle)} · ${escapeHtml(application.status)}</strong>
+              <span>${escapeHtml(application.statement)}</span>
+              ${application.status === "已通过"
+                ? `<small>后续联系：${escapeHtml(application.mentorContact)}</small>`
+                : ""}
+              ${application.status === "未通过"
+                ? `<small>导师反馈：${escapeHtml(application.mentorFeedback)}</small>`
+                : ""}
+              ${application.status === "待审核"
+                ? `<small>导师暂未审批，请稍后查看。</small>`
+                : ""}
+            </section>
+          `
+        )
+        .join("");
+}
+
 function renderCertificates() {
   if (!session || session.user.role !== "student") {
     selectors.certificateList.innerHTML = `<p class="empty">登录后显示个人证书记录。</p>`;
@@ -526,7 +639,12 @@ function renderAdmin() {
 }
 
 function renderMentorApplications() {
-  const applications = listResearchApplicationsForMentor(state, "mentor_1");
+  if (!session || session.user.role !== "mentor") {
+    selectors.mentorApplications.innerHTML = `<p class="empty">切换为导师后显示申请队列。</p>`;
+    return;
+  }
+
+  const applications = listResearchApplicationsForMentor(state, session.user.id);
   selectors.mentorApplications.innerHTML = applications.length === 0
     ? `<p class="empty">暂无科研项目申请。</p>`
     : applications
@@ -536,6 +654,52 @@ function renderMentorApplications() {
               <strong>${escapeHtml(application.studentName)} 申请 ${escapeHtml(application.researchTitle)}</strong>
               <span>${escapeHtml(application.status)}</span>
               <small>${escapeHtml(application.statement)}</small>
+              ${application.status === "待审核"
+                ? `
+                  <form class="review-form" data-application-review-form data-application-id="${escapeHtml(application.id)}">
+                    <label>
+                      通过后的联系方式
+                      <input name="contact" placeholder="QQ群 / 邮箱 / 会议链接">
+                    </label>
+                    <label>
+                      反馈
+                      <textarea name="feedback" placeholder="通过说明或未通过原因"></textarea>
+                    </label>
+                    <div class="button-row">
+                      <button name="decision" value="approve" type="submit">通过</button>
+                      <button class="secondary" name="decision" value="reject" type="submit">不通过</button>
+                    </div>
+                  </form>
+                `
+                : `
+                  <small>${application.mentorContact ? `后续联系：${escapeHtml(application.mentorContact)}` : ""}</small>
+                  <small>${application.mentorFeedback ? `导师反馈：${escapeHtml(application.mentorFeedback)}` : ""}</small>
+                `}
+            </section>
+          `
+        )
+        .join("");
+}
+
+function renderMentorProjects() {
+  if (!session || session.user.role !== "mentor") {
+    selectors.mentorProjects.innerHTML = `<p class="empty">切换为导师后显示你发布的科研项目。</p>`;
+    return;
+  }
+
+  const projects = listResearchProjectsForMentor(state, session.user.id);
+  selectors.mentorProjects.innerHTML = projects.length === 0
+    ? `<p class="empty">还没有发布科研项目。</p>`
+    : projects
+        .map(
+          (project) => `
+            <section class="mini-card project-row">
+              <div>
+                <strong>${escapeHtml(project.title)}</strong>
+                <span>${escapeHtml(project.direction)} · ${escapeHtml(project.status)} · QQ群 ${escapeHtml(project.qqGroup)}</span>
+                <small>${project.techStack.map(escapeHtml).join(" / ")}</small>
+              </div>
+              <button class="secondary" data-delete-research-id="${escapeHtml(project.id)}">删除</button>
             </section>
           `
         )

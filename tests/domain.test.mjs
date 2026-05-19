@@ -7,6 +7,7 @@ import {
   createTeamRecruit,
   createInitialState,
   createResearchProject,
+  deleteResearchProject,
   deleteDatabaseRecord,
   getAdminDatabaseView,
   getDatabaseSnapshot,
@@ -15,10 +16,13 @@ import {
   listCertificateRecords,
   listCertificateCollection,
   listResearchApplicationsForMentor,
+  listResearchApplicationsForStudent,
+  listResearchProjectsForMentor,
   listOpportunities,
   login,
   listFeedbackEntries,
   recordUsage,
+  reviewResearchApplication,
   registerUser,
   registerStudent,
   submitFeedback,
@@ -240,6 +244,96 @@ test("admin can add competitions and research projects for the opportunity hall"
   assert.ok(
     opportunities.some((opportunity) => opportunity.title === "多模态课程资源检索系统")
   );
+});
+
+test("mentor can add and delete their own research projects", () => {
+  const mentor = registerUser(createInitialState(), {
+    role: "mentor",
+    name: "刘老师",
+    email: "mentor-create@whu.edu.cn",
+    password: "Passw0rd!",
+    department: "计算机学院"
+  });
+
+  const created = createResearchProject(mentor.state, mentor.user.id, {
+    title: "可信软件测试工具",
+    direction: "软件工程",
+    techStack: "JavaScript, 自动化测试",
+    qqGroup: "867890123",
+    description: "面向课程项目构建自动化测试和质量分析工具。",
+    status: "招募中"
+  });
+
+  const mentorProjects = listResearchProjectsForMentor(created.state, mentor.user.id);
+  assert.equal(mentorProjects.length, 1);
+  assert.equal(mentorProjects[0].title, "可信软件测试工具");
+  assert.ok(listOpportunities(created.state).some((opportunity) => opportunity.id === created.researchProject.id));
+
+  const deleted = deleteResearchProject(created.state, mentor.user.id, created.researchProject.id);
+  assert.equal(listResearchProjectsForMentor(deleted.state, mentor.user.id).length, 0);
+  assert.ok(!listOpportunities(deleted.state).some((opportunity) => opportunity.id === created.researchProject.id));
+});
+
+test("mentor can approve or reject research applications with student-facing result details", () => {
+  const mentor = registerUser(createInitialState(), {
+    role: "mentor",
+    name: "审阅导师",
+    email: "reviewer@whu.edu.cn",
+    password: "Passw0rd!",
+    department: "计算机学院"
+  });
+  const project = createResearchProject(mentor.state, mentor.user.id, {
+    title: "课程知识图谱构建",
+    direction: "知识工程",
+    techStack: ["Python", "Neo4j"],
+    qqGroup: "878901234",
+    description: "整理课程实体关系并构建可查询原型。"
+  });
+  const student = registerStudent(project.state, {
+    name: "申请同学",
+    email: "apply-review@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const applied = applyToResearchProject(student.state, {
+    researchId: project.researchProject.id,
+    studentUserId: student.user.id,
+    statement: "我做过图数据库课程实验，希望参与。"
+  });
+
+  const approved = reviewResearchApplication(applied.state, mentor.user.id, {
+    applicationId: applied.application.id,
+    decision: "approve",
+    contact: "QQ群 878901234，备注：知识图谱申请",
+    feedback: "基础匹配，先加入群沟通任务。"
+  });
+  const studentApplications = listResearchApplicationsForStudent(approved.state, student.user.id);
+
+  assert.equal(studentApplications[0].status, "已通过");
+  assert.equal(studentApplications[0].mentorContact, "QQ群 878901234，备注：知识图谱申请");
+  assert.equal(studentApplications[0].mentorFeedback, "基础匹配，先加入群沟通任务。");
+
+  const secondStudent = registerStudent(approved.state, {
+    name: "另一个同学",
+    email: "reject-review@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const secondApplied = applyToResearchProject(secondStudent.state, {
+    researchId: project.researchProject.id,
+    studentUserId: secondStudent.user.id,
+    statement: "暂时只有一点兴趣。"
+  });
+  const rejected = reviewResearchApplication(secondApplied.state, mentor.user.id, {
+    applicationId: secondApplied.application.id,
+    decision: "reject",
+    feedback: "本轮需要有课程项目或检索经验，可以下轮再投。"
+  });
+  const rejectedApplications = listResearchApplicationsForStudent(rejected.state, secondStudent.user.id);
+
+  assert.equal(rejectedApplications[0].status, "未通过");
+  assert.equal(rejectedApplications[0].mentorContact, "");
+  assert.equal(rejectedApplications[0].mentorFeedback, "本轮需要有课程项目或检索经验，可以下轮再投。");
 });
 
 test("student can browse opportunities across competitions and research projects", () => {

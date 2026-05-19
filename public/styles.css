@@ -233,6 +233,16 @@ button.secondary {
   padding: 14px;
 }
 
+.project-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.review-form {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
 .certificate-panel {
   min-height: 360px;
 }
@@ -406,6 +416,10 @@ dd {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-row {
     grid-template-columns: 1fr;
   }
 }

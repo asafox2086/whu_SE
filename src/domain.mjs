@@ -217,9 +217,11 @@ export function createCompetition(state, adminUserId, payload) {
 }
 
 export function createResearchProject(state, adminUserId, payload) {
-  findAdminByUserId(state, adminUserId);
+  const actor = findResearchProjectMaintainer(state, adminUserId);
   const next = cloneState(state);
-  const mentorId = optionalText(payload.mentorId, next.mentors[0]?.id ?? "");
+  const mentorId = actor.role === "mentor"
+    ? actor.mentor.id
+    : optionalText(payload.mentorId, next.mentors[0]?.id ?? "");
   if (!next.mentors.some((mentor) => mentor.id === mentorId)) {
     throw new DomainError("导师不存在", "MENTOR_NOT_FOUND");
   }
@@ -240,6 +242,34 @@ export function createResearchProject(state, adminUserId, payload) {
   return {
     state: next,
     researchProject
+  };
+}
+
+export function listResearchProjectsForMentor(state, mentorIdentifier) {
+  const mentorId = resolveMentorId(state, mentorIdentifier);
+  return state.researchProjects
+    .filter((project) => project.mentorId === mentorId)
+    .map((project) => presentResearchProject(state, project));
+}
+
+export function deleteResearchProject(state, mentorUserId, researchId) {
+  const mentor = findMentorByUserId(state, mentorUserId);
+  const next = cloneState(state);
+  const project = next.researchProjects.find((item) => item.id === researchId);
+  if (!project) {
+    throw new DomainError("科研项目不存在", "RESEARCH_NOT_FOUND");
+  }
+  if (project.mentorId !== mentor.id) {
+    throw new DomainError("只能维护自己发布的科研项目", "MENTOR_PROJECT_FORBIDDEN");
+  }
+
+  next.researchProjects = next.researchProjects.filter((item) => item.id !== researchId);
+  next.applications = next.applications.filter(
+    (application) => !(application.targetType === "research" && application.targetId === researchId)
+  );
+
+  return {
+    state: next
   };
 }
 
@@ -320,9 +350,10 @@ export function applyToResearchProject(state, payload) {
 }
 
 export function listResearchApplicationsForMentor(state, mentorId) {
+  const resolvedMentorId = resolveMentorId(state, mentorId);
   const researchIds = new Set(
     state.researchProjects
-      .filter((project) => project.mentorId === mentorId)
+      .filter((project) => project.mentorId === resolvedMentorId)
       .map((project) => project.id)
   );
 
@@ -332,6 +363,47 @@ export function listResearchApplicationsForMentor(state, mentorId) {
         application.targetType === "research" && researchIds.has(application.targetId)
     )
     .map((application) => presentApplication(state, application));
+}
+
+export function listResearchApplicationsForStudent(state, studentUserId) {
+  const student = findStudentByUserId(state, studentUserId);
+  return state.applications
+    .filter((application) => application.studentId === student.id)
+    .map((application) => presentApplication(state, application));
+}
+
+export function reviewResearchApplication(state, mentorUserId, payload) {
+  const mentor = findMentorByUserId(state, mentorUserId);
+  const next = cloneState(state);
+  const application = next.applications.find((item) => item.id === payload.applicationId);
+  if (!application || application.targetType !== "research") {
+    throw new DomainError("科研申请不存在", "APPLICATION_NOT_FOUND");
+  }
+
+  const project = next.researchProjects.find((item) => item.id === application.targetId);
+  if (!project) {
+    throw new DomainError("科研项目不存在", "RESEARCH_NOT_FOUND");
+  }
+  if (project.mentorId !== mentor.id) {
+    throw new DomainError("只能审批自己科研项目的申请", "MENTOR_APPLICATION_FORBIDDEN");
+  }
+
+  const decision = normalizeReviewDecision(payload.decision);
+  if (decision === "approve") {
+    application.status = "已通过";
+    application.mentorContact = requiredText(payload.contact, "后续联系方式");
+    application.mentorFeedback = optionalText(payload.feedback, "请按联系方式继续沟通。");
+  } else {
+    application.status = "未通过";
+    application.mentorContact = "";
+    application.mentorFeedback = requiredText(payload.feedback, "未通过反馈");
+  }
+  application.reviewedAt = new Date().toISOString();
+
+  return {
+    state: next,
+    application: presentApplication(next, application)
+  };
 }
 
 export function uploadCertificateRecord(state, payload) {
@@ -622,6 +694,42 @@ function findAdminByUserId(state, userId) {
   return admin;
 }
 
+function findResearchProjectMaintainer(state, userId) {
+  const user = state.users.find((candidate) => candidate.id === userId);
+  if (user?.role === "admin") {
+    return {
+      role: "admin",
+      admin: findAdminByUserId(state, userId)
+    };
+  }
+  if (user?.role === "mentor") {
+    return {
+      role: "mentor",
+      mentor: findMentorByUserId(state, userId)
+    };
+  }
+  throw new DomainError("只有管理员或导师可以维护科研项目", "RESEARCH_MAINTAINER_REQUIRED");
+}
+
+function findMentorByUserId(state, userId) {
+  const user = state.users.find((candidate) => candidate.id === userId);
+  const mentor = state.mentors.find((candidate) => candidate.userId === userId);
+  if (!user || !mentor || user.role !== "mentor") {
+    throw new DomainError("只有导师可以执行该操作", "MENTOR_REQUIRED");
+  }
+  return mentor;
+}
+
+function resolveMentorId(state, mentorIdentifier) {
+  const mentor = state.mentors.find(
+    (candidate) => candidate.id === mentorIdentifier || candidate.userId === mentorIdentifier
+  );
+  if (!mentor) {
+    throw new DomainError("导师不存在", "MENTOR_NOT_FOUND");
+  }
+  return mentor.id;
+}
+
 function findCertificateCollectorByUserId(state, userId) {
   const user = state.users.find((candidate) => candidate.id === userId);
   const collector = state.certificateCollectors.find(
@@ -708,6 +816,24 @@ function normalizeTags(tags, label) {
   return normalized;
 }
 
+function normalizeReviewDecision(decision) {
+  const normalized = `${decision ?? ""}`.trim();
+  const decisions = {
+    approve: "approve",
+    approved: "approve",
+    pass: "approve",
+    通过: "approve",
+    reject: "reject",
+    rejected: "reject",
+    fail: "reject",
+    不通过: "reject"
+  };
+  if (!decisions[normalized]) {
+    throw new DomainError("审批结果只能是通过或不通过", "INVALID_REVIEW_DECISION");
+  }
+  return decisions[normalized];
+}
+
 function nextId(prefix, collection) {
   const maxNumber = (collection ?? []).reduce((max, record) => {
     const id = `${record.id ?? ""}`;
@@ -752,6 +878,8 @@ function usageActionLabel(action) {
     submit_feedback: "提交反馈",
     create_competition: "新增竞赛",
     create_research_project: "新增科研项目",
+    delete_research_project: "删除科研项目",
+    review_research_application: "审批科研申请",
     delete_database_record: "删除数据库记录"
   };
   return labels[action] ?? action;
@@ -847,6 +975,15 @@ function presentCertificateRecord(state, certificateRecord) {
   };
 }
 
+function presentResearchProject(state, project) {
+  const mentor = state.mentors.find((candidate) => candidate.id === project.mentorId);
+  const user = state.users.find((candidate) => candidate.id === mentor?.userId);
+  return {
+    ...project,
+    mentorName: user?.name ?? mentor?.name ?? "未知导师"
+  };
+}
+
 function presentFeedback(state, feedback) {
   const user = feedback.userId
     ? state.users.find((candidate) => candidate.id === feedback.userId)
@@ -873,7 +1010,9 @@ function presentApplication(state, application) {
   return {
     ...application,
     studentName: user?.name ?? "未知学生",
-    researchTitle: research?.title
+    researchTitle: research?.title,
+    mentorContact: application.mentorContact ?? "",
+    mentorFeedback: application.mentorFeedback ?? ""
   };
 }
 

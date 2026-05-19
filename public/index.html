@@ -120,6 +120,8 @@
           </label>
           <button type="submit">提交申请</button>
         </form>
+        <h3>我的申请结果</h3>
+        <div class="stack" data-student-applications></div>
       </section>
 
       <section class="panel certificate-panel" data-role-panel="student">
@@ -231,6 +233,38 @@
 
       <section class="panel mentor-panel" data-role-panel="mentor">
         <p class="eyebrow">导师侧演示</p>
+        <h2>我的科研项目</h2>
+        <form data-mentor-research-form>
+          <label>
+            项目名称
+            <input name="title" required placeholder="可信软件测试工具">
+          </label>
+          <label>
+            方向
+            <input name="direction" required placeholder="软件工程">
+          </label>
+          <label>
+            技术栈
+            <input name="techStack" required placeholder="JavaScript, 自动化测试">
+          </label>
+          <label>
+            交流群
+            <input name="qqGroup" required placeholder="867890123">
+          </label>
+          <label>
+            状态
+            <select name="status">
+              <option value="招募中">招募中</option>
+              <option value="已结束">已结束</option>
+            </select>
+          </label>
+          <label>
+            简介
+            <textarea name="description" required placeholder="面向课程项目构建自动化测试和质量分析工具。"></textarea>
+          </label>
+          <button type="submit">发布科研项目</button>
+        </form>
+        <div class="stack" data-mentor-projects></div>
         <h2>科研申请队列</h2>
         <div class="stack" data-mentor-applications></div>
       </section>
