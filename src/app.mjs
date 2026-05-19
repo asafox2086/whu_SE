@@ -4,9 +4,12 @@ import {
   createInitialState,
   createResearchProject,
   createTeamRecruit,
+  blockUser,
   deleteCertificateRecord,
   deleteResearchApplication,
   deleteResearchProject,
+  deleteTeamRecruit,
+  deleteUser,
   deleteDatabaseRecord,
   DomainError,
   getAdminDatabaseView,
@@ -20,11 +23,14 @@ import {
   listResearchApplicationsForMentor,
   listResearchApplicationsForStudent,
   listResearchProjectsForMentor,
+  listTeamRecruitsForStudent,
   login,
   recordUsage,
   registerUser,
   reviewResearchApplication,
+  stopTeamRecruit,
   submitFeedback,
+  unblockUser,
   uploadCertificateRecord
 } from "./domain.mjs";
 
@@ -47,6 +53,7 @@ const selectors = {
   opportunityList: document.querySelector("[data-opportunity-list]"),
   detailPanel: document.querySelector("[data-detail-panel]"),
   recruitForm: document.querySelector("[data-recruit-form]"),
+  studentRecruits: document.querySelector("[data-student-recruits]"),
   researchApplyForm: document.querySelector("[data-research-apply-form]"),
   studentApplications: document.querySelector("[data-student-applications]"),
   certificateForm: document.querySelector("[data-certificate-form]"),
@@ -69,6 +76,8 @@ selectors.logoutButton.addEventListener("click", handleLogout);
 selectors.opportunityFilters.addEventListener("click", handleOpportunityFilter);
 selectors.opportunityList.addEventListener("click", handleOpportunityClick);
 selectors.recruitForm.addEventListener("submit", handleRecruitSubmit);
+selectors.detailPanel.addEventListener("click", handleRecruitManagementClick);
+selectors.studentRecruits.addEventListener("click", handleRecruitManagementClick);
 selectors.researchApplyForm.addEventListener("submit", handleResearchApplySubmit);
 selectors.studentApplications.addEventListener("click", handleStudentApplicationsClick);
 selectors.certificateForm.addEventListener("submit", handleCertificateSubmit);
@@ -76,6 +85,7 @@ selectors.certificateList.addEventListener("click", handleCertificateListClick);
 selectors.certificateCollection.addEventListener("click", handleCertificateCollectionClick);
 selectors.feedbackForm.addEventListener("submit", handleFeedbackSubmit);
 selectors.adminDatabase.addEventListener("click", handleAdminDatabaseClick);
+selectors.adminUsers.addEventListener("click", handleAdminUsersClick);
 selectors.adminCompetitionForm.addEventListener("submit", handleAdminCompetitionSubmit);
 selectors.adminResearchForm.addEventListener("submit", handleAdminResearchSubmit);
 selectors.mentorResearchForm.addEventListener("submit", handleMentorResearchSubmit);
@@ -163,6 +173,37 @@ function handleRecruitSubmit(event) {
     showToast("组队招募已发布");
     render();
     renderOpportunityDetail("competition", form.get("competitionId"));
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleRecruitManagementClick(event) {
+  const button = event.target.closest("button[data-team-recruit-action]");
+  if (!button) {
+    return;
+  }
+
+  try {
+    requireSession();
+    const action = button.dataset.teamRecruitAction;
+    const recruitId = button.dataset.teamRecruitId;
+    if (action === "stop") {
+      const updated = stopTeamRecruit(state, session.user.id, recruitId);
+      state = updated.state;
+      trackUsage("stop_team_recruit", recruitId);
+      showToast("招募已标记为不招了");
+    } else if (action === "delete") {
+      const updated = deleteTeamRecruit(state, session.user.id, recruitId);
+      state = updated.state;
+      trackUsage("delete_team_recruit", recruitId);
+      showToast("招募已删除");
+    }
+    saveState();
+    render();
+    if (session.user.role === "student") {
+      renderOpportunityDetail("competition", button.dataset.competitionId ?? "competition_1");
+    }
   } catch (error) {
     showToast(error.message, true);
   }
@@ -325,6 +366,39 @@ function handleAdminDatabaseClick(event) {
   }
 }
 
+function handleAdminUsersClick(event) {
+  const button = event.target.closest("button[data-admin-user-action]");
+  if (!button) {
+    return;
+  }
+
+  try {
+    requireSession();
+    const action = button.dataset.adminUserAction;
+    const userId = button.dataset.adminUserId;
+    if (action === "block") {
+      const updated = blockUser(state, session.user.id, userId);
+      state = updated.state;
+      trackUsage("block_user", userId);
+      showToast("用户已封禁");
+    } else if (action === "unblock") {
+      const updated = unblockUser(state, session.user.id, userId);
+      state = updated.state;
+      trackUsage("unblock_user", userId);
+      showToast("用户已解除封禁");
+    } else if (action === "delete") {
+      const updated = deleteUser(state, session.user.id, userId);
+      state = updated.state;
+      trackUsage("delete_user", userId);
+      showToast("用户已删除");
+    }
+    saveState();
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
 function handleAdminCompetitionSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -474,6 +548,7 @@ function render() {
   renderAuth();
   renderOpportunities();
   renderForms();
+  renderStudentRecruits();
   renderStudentApplications();
   renderCertificates();
   renderCertificateCollection();
@@ -563,17 +638,39 @@ function renderRecruitList(recruits) {
   if (recruits.length === 0) {
     return `<p class="empty">暂无招募，登录后可发布第一条。</p>`;
   }
+  const currentStudentId = getCurrentStudentId();
   return recruits
     .map(
       (recruit) => `
         <section class="mini-card">
-          <strong>${escapeHtml(recruit.title)}</strong>
-          <span>${escapeHtml(recruit.publisherName)} · ${escapeHtml(recruit.contact)}</span>
-          <small>${recruit.skills.map(escapeHtml).join(" / ")}</small>
+          <div class="record-head">
+            <div>
+              <strong>${escapeHtml(recruit.title)}</strong>
+              <span>${escapeHtml(recruit.competitionTitle)} · ${escapeHtml(recruit.publisherName)} · ${escapeHtml(recruit.contact)}</span>
+              <small>${recruit.skills.map(escapeHtml).join(" / ")} · ${escapeHtml(recruit.status)}</small>
+            </div>
+            ${currentStudentId && recruit.studentId === currentStudentId
+              ? `
+                <div class="button-row">
+                  ${recruit.status === "有效"
+                    ? `<button data-team-recruit-action="stop" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">标记不招了</button>`
+                    : ""}
+                  <button class="secondary" data-team-recruit-action="delete" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">删除</button>
+                </div>
+              `
+              : ""}
+          </div>
         </section>
       `
     )
     .join("");
+}
+
+function getCurrentStudentId() {
+  if (!session || session.user.role !== "student") {
+    return null;
+  }
+  return state.students.find((student) => student.userId === session.user.id)?.id ?? null;
 }
 
 function renderForms() {
@@ -588,6 +685,18 @@ function renderForms() {
   selectors.recruitForm.elements.competitionId.innerHTML = competitionOptions;
   selectors.researchApplyForm.elements.researchId.innerHTML = researchOptions;
   selectors.certificateForm.elements.competitionId.innerHTML = competitionOptions;
+}
+
+function renderStudentRecruits() {
+  if (!session || session.user.role !== "student") {
+    selectors.studentRecruits.innerHTML = `<p class="empty">登录后显示你发布的组队招募。</p>`;
+    return;
+  }
+
+  const recruits = listTeamRecruitsForStudent(state, session.user.id);
+  selectors.studentRecruits.innerHTML = recruits.length === 0
+    ? `<p class="empty">还没有发布组队招募。</p>`
+    : renderRecruitList(recruits);
 }
 
 function renderStudentApplications() {
@@ -706,13 +815,26 @@ function renderAdmin() {
   }
 
   const users = listRegisteredUsers(state, session.user.id);
+  const currentUserId = session.user.id;
   selectors.adminUsers.innerHTML = users
     .map(
       (user) => `
         <section class="mini-card">
-          <strong>${escapeHtml(user.name)} · ${escapeHtml(user.roleLabel)}</strong>
-          <span>${escapeHtml(user.email)} · ${escapeHtml(user.status)}</span>
-          <small>${escapeHtml(user.id)}</small>
+          <div class="record-head">
+            <div>
+              <strong>${escapeHtml(user.name)} · ${escapeHtml(user.roleLabel)}</strong>
+              <span>${escapeHtml(user.email)} · ${escapeHtml(user.status)}</span>
+              <small>${escapeHtml(user.id)}</small>
+            </div>
+            ${user.id === currentUserId
+              ? `<small>当前登录</small>`
+              : `
+                <div class="button-row">
+                  <button data-admin-user-action="${user.status === "封禁" ? "unblock" : "block"}" data-admin-user-id="${escapeHtml(user.id)}">${user.status === "封禁" ? "解封" : "封禁"}</button>
+                  <button class="secondary" data-admin-user-action="delete" data-admin-user-id="${escapeHtml(user.id)}">删除</button>
+                </div>
+              `}
+          </div>
         </section>
       `
     )

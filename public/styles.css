@@ -110,6 +110,10 @@ h3 {
   grid-column: 1;
 }
 
+.action-panel[data-role-panel="student"] {
+  grid-column: 2;
+}
+
 .section-head,
 .button-row,
 .item-card footer,

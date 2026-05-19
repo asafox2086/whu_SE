@@ -318,6 +318,50 @@ export function getCompetitionDetail(state, competitionId) {
   };
 }
 
+export function listTeamRecruitsForStudent(state, studentUserId) {
+  const student = findStudentByUserId(state, studentUserId);
+  return state.teamRecruits
+    .filter((recruit) => recruit.studentId === student.id)
+    .map((recruit) => presentTeamRecruit(state, recruit));
+}
+
+export function stopTeamRecruit(state, studentUserId, recruitId) {
+  const student = findStudentByUserId(state, studentUserId);
+  const next = cloneState(state);
+  const recruit = next.teamRecruits.find((item) => item.id === recruitId);
+  if (!recruit) {
+    throw new DomainError("组队招募不存在", "TEAM_RECRUIT_NOT_FOUND");
+  }
+  if (recruit.studentId !== student.id) {
+    throw new DomainError("只能操作自己发布的组队招募", "TEAM_RECRUIT_FORBIDDEN");
+  }
+
+  recruit.status = "不招了";
+
+  return {
+    state: next,
+    recruit: presentTeamRecruit(next, recruit)
+  };
+}
+
+export function deleteTeamRecruit(state, studentUserId, recruitId) {
+  const student = findStudentByUserId(state, studentUserId);
+  const next = cloneState(state);
+  const recruit = next.teamRecruits.find((item) => item.id === recruitId);
+  if (!recruit) {
+    throw new DomainError("组队招募不存在", "TEAM_RECRUIT_NOT_FOUND");
+  }
+  if (recruit.studentId !== student.id) {
+    throw new DomainError("只能删除自己发布的组队招募", "TEAM_RECRUIT_FORBIDDEN");
+  }
+
+  next.teamRecruits = next.teamRecruits.filter((item) => item.id !== recruitId);
+
+  return {
+    state: next
+  };
+}
+
 export function applyToResearchProject(state, payload) {
   const next = cloneState(state);
   const research = next.researchProjects.find((item) => item.id === payload.researchId);
@@ -580,6 +624,62 @@ export function listRegisteredUsers(state, adminUserId) {
   }));
 }
 
+export function blockUser(state, adminUserId, userId) {
+  findAdminByUserId(state, adminUserId);
+  if (adminUserId === userId) {
+    throw new DomainError("管理员不能封禁自己", "ADMIN_SELF_BLOCK_FORBIDDEN");
+  }
+
+  const next = cloneState(state);
+  const user = next.users.find((candidate) => candidate.id === userId);
+  if (!user) {
+    throw new DomainError("用户不存在", "USER_NOT_FOUND");
+  }
+
+  user.status = "封禁";
+
+  return {
+    state: next,
+    user: publicUser(user)
+  };
+}
+
+export function unblockUser(state, adminUserId, userId) {
+  findAdminByUserId(state, adminUserId);
+  const next = cloneState(state);
+  const user = next.users.find((candidate) => candidate.id === userId);
+  if (!user) {
+    throw new DomainError("用户不存在", "USER_NOT_FOUND");
+  }
+
+  user.status = "正常";
+
+  return {
+    state: next,
+    user: publicUser(user)
+  };
+}
+
+export function deleteUser(state, adminUserId, userId) {
+  findAdminByUserId(state, adminUserId);
+  if (adminUserId === userId) {
+    throw new DomainError("管理员不能删除自己", "ADMIN_SELF_DELETE_FORBIDDEN");
+  }
+
+  const next = cloneState(state);
+  const user = next.users.find((candidate) => candidate.id === userId);
+  if (!user) {
+    throw new DomainError("用户不存在", "USER_NOT_FOUND");
+  }
+
+  cascadeDeleteUserProfile(next, user);
+  next.users = next.users.filter((candidate) => candidate.id !== userId);
+
+  return {
+    state: next
+  };
+}
+
 export function getDatabaseSnapshot(state, adminUserId) {
   findAdminByUserId(state, adminUserId);
   return {
@@ -821,6 +921,47 @@ function certificateRecordsOf(state) {
   return state.certificateRecords ?? [];
 }
 
+function cascadeDeleteUserProfile(state, user) {
+  if (user.role === "student") {
+    const student = state.students.find((candidate) => candidate.userId === user.id);
+    state.students = state.students.filter((candidate) => candidate.userId !== user.id);
+    if (student) {
+      state.teamRecruits = state.teamRecruits.filter((recruit) => recruit.studentId !== student.id);
+      state.applications = state.applications.filter((application) => application.studentId !== student.id);
+      state.certificateRecords = certificateRecordsOf(state).filter((record) => record.studentId !== student.id);
+    }
+    return;
+  }
+
+  if (user.role === "mentor") {
+    const mentor = state.mentors.find((candidate) => candidate.userId === user.id);
+    state.mentors = state.mentors.filter((candidate) => candidate.userId !== user.id);
+    if (mentor) {
+      const researchIds = new Set(
+        state.researchProjects
+          .filter((project) => project.mentorId === mentor.id)
+          .map((project) => project.id)
+      );
+      state.researchProjects = state.researchProjects.filter((project) => project.mentorId !== mentor.id);
+      state.applications = state.applications.filter(
+        (application) => !(application.targetType === "research" && researchIds.has(application.targetId))
+      );
+    }
+    return;
+  }
+
+  if (user.role === "certificate_collector") {
+    state.certificateCollectors = (state.certificateCollectors ?? []).filter(
+      (collector) => collector.userId !== user.id
+    );
+    return;
+  }
+
+  if (user.role === "admin") {
+    state.admins = (state.admins ?? []).filter((admin) => admin.userId !== user.id);
+  }
+}
+
 function feedbackEntriesOf(state) {
   return state.feedbackEntries ?? [];
 }
@@ -960,6 +1101,8 @@ function usageActionLabel(action) {
     view_opportunity: "浏览机会",
     filter_opportunities: "筛选机会",
     publish_team_recruit: "发布组队招募",
+    stop_team_recruit: "标记组队招募不招了",
+    delete_team_recruit: "删除组队招募",
     apply_research: "提交科研申请",
     delete_research_application: "删除科研申请",
     upload_certificate_record: "上传证书记录",
@@ -971,6 +1114,9 @@ function usageActionLabel(action) {
     create_research_project: "新增科研项目",
     delete_research_project: "删除科研项目",
     review_research_application: "审批科研申请",
+    block_user: "封禁用户",
+    unblock_user: "解除封禁用户",
+    delete_user: "删除用户",
     delete_database_record: "删除数据库记录"
   };
   return labels[action] ?? action;
@@ -1112,9 +1258,11 @@ function presentApplication(state, application) {
 function presentTeamRecruit(state, recruit) {
   const student = state.students.find((candidate) => candidate.id === recruit.studentId);
   const user = state.users.find((candidate) => candidate.id === student?.userId);
+  const competition = state.competitions.find((candidate) => candidate.id === recruit.competitionId);
   return {
     ...recruit,
-    publisherName: user?.name ?? "未知学生"
+    publisherName: user?.name ?? "未知学生",
+    competitionTitle: competition?.title ?? "未知竞赛"
   };
 }
 

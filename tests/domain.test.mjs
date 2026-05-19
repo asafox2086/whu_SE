@@ -7,9 +7,12 @@ import {
   createTeamRecruit,
   createInitialState,
   createResearchProject,
+  blockUser,
   deleteCertificateRecord,
   deleteResearchProject,
   deleteResearchApplication,
+  deleteTeamRecruit,
+  deleteUser,
   deleteDatabaseRecord,
   getAdminDatabaseView,
   getDatabaseSnapshot,
@@ -20,6 +23,7 @@ import {
   listCertificateCollectionByCompetition,
   listResearchApplicationsForMentor,
   listResearchApplicationsForStudent,
+  listTeamRecruitsForStudent,
   listResearchProjectsForMentor,
   listOpportunities,
   login,
@@ -28,6 +32,7 @@ import {
   reviewResearchApplication,
   registerUser,
   registerStudent,
+  stopTeamRecruit,
   submitFeedback,
   uploadCertificateRecord
 } from "../src/domain.mjs";
@@ -249,6 +254,39 @@ test("admin can add competitions and research projects for the opportunity hall"
   );
 });
 
+test("admin can block and delete registered users", () => {
+  const admin = registerUser(createInitialState(), {
+    role: "admin",
+    name: "管理员",
+    email: "admin-users@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+  const student = registerStudent(admin.state, {
+    name: "待处理同学",
+    email: "blocked@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+
+  const blocked = blockUser(student.state, admin.user.id, student.user.id);
+  assert.equal(
+    listRegisteredUsers(blocked.state, admin.user.id).find((user) => user.id === student.user.id).status,
+    "封禁"
+  );
+  assert.throws(
+    () => login(blocked.state, {
+      role: "student",
+      email: "blocked@whu.edu.cn",
+      password: "Passw0rd!"
+    }),
+    /账号当前不可登录/
+  );
+
+  const deleted = deleteUser(blocked.state, admin.user.id, student.user.id);
+  assert.ok(!listRegisteredUsers(deleted.state, admin.user.id).some((user) => user.id === student.user.id));
+  assert.equal(getDatabaseSnapshot(deleted.state, admin.user.id).tables.students.length, 0);
+});
+
 test("mentor can add and delete their own research projects", () => {
   const mentor = registerUser(createInitialState(), {
     role: "mentor",
@@ -386,6 +424,29 @@ test("student can delete their own uploaded certificate record", () => {
   );
 
   assert.equal(listCertificateRecords(deleted.state, student.user.id).length, 0);
+});
+
+test("student can stop recruiting and delete their own team recruit", () => {
+  const student = registerStudent(createInitialState(), {
+    name: "队长同学",
+    email: "recruit-owner@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const created = createTeamRecruit(student.state, {
+    competitionId: "competition_1",
+    studentUserId: student.user.id,
+    title: "寻找后端和算法同学",
+    skills: ["Node.js", "算法"],
+    contact: "QQ 123123123"
+  });
+
+  const stopped = stopTeamRecruit(created.state, student.user.id, created.recruit.id);
+  assert.equal(listTeamRecruitsForStudent(stopped.state, student.user.id)[0].status, "不招了");
+  assert.equal(getCompetitionDetail(stopped.state, "competition_1").teamRecruits.length, 0);
+
+  const deleted = deleteTeamRecruit(stopped.state, student.user.id, created.recruit.id);
+  assert.equal(listTeamRecruitsForStudent(deleted.state, student.user.id).length, 0);
 });
 
 test("certificate collector can review certificates grouped by competition with downloadable archive names", () => {
