@@ -6,6 +6,7 @@
 
 - `public/`: 静态页面和样式
 - `src/`: MVP 领域逻辑和浏览器交互
+- `data/`: 本地数据库说明和示例结构
 - `tests/`: 核心流程行为测试
 - `scripts/`: 本地启动脚本
 - `MVP/`: 课程要求的优先级清单和验证反馈报告
@@ -70,7 +71,9 @@ npm test
 - 科研申请与导师侧演示队列
 - 独立证书中心，支持图片证书预览、学生证书记录保存、证书收集者汇总查看
 - 管理员模式，可查看注册用户、可读数据库视图，并删除竞赛、科研项目和测试记录
+- 管理员可新增竞赛和科研项目，新增内容会进入机会大厅
 - 使用信息记录与手动反馈收集
+- 本地数据库文件持久化，运行本地服务时数据保存到 `data/state.local.json`
 
 暂不包含：
 
@@ -82,4 +85,6 @@ npm test
 
 ## 数据说明
 
-当前 MVP 使用浏览器 `localStorage` 保存演示数据。需要清空数据时，可在浏览器开发者工具中删除 `xinggui_mvp_state_v1` 和 `xinggui_mvp_session_v1`。
+运行 `npm start` 时，MVP 会通过本地服务读写 `data/state.local.json`。该文件是本机演示数据，不会提交到 GitHub；`data/state.example.json` 用来说明数据结构。
+
+页面仍会把数据同步到浏览器 `localStorage` 作为兜底。需要清空数据时，可删除 `data/state.local.json`，也可在浏览器开发者工具中删除 `xinggui_mvp_state_v1` 和 `xinggui_mvp_session_v1`。

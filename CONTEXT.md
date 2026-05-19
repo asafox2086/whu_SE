@@ -40,6 +40,10 @@ _Avoid_: 超级用户
 管理员看到的当前演示数据表及其记录集合。
 _Avoid_: 后台数据（含义过宽）
 
+**本地数据库文件**:
+MVP 本地服务读写的 JSON 状态文件，用于保存演示数据并方便管理员检查。
+_Avoid_: 真实数据库（容易误解为生产级后端）
+
 **使用反馈**:
 早期用户在试用 MVP 时留下的使用信息和主观意见记录。
 _Avoid_: 问卷（只是一种收集形式）
@@ -63,6 +67,7 @@ _Avoid_: 用户（讨论业务行为时过宽）
 - A **证书收集者** can view many **证书记录**.
 - A **使用反馈** can be linked to a **学生**, **导师**, or **证书收集者**.
 - An **管理员** can inspect a **数据库快照** and delete selected test records.
+- A **本地数据库文件** stores the current MVP state when the local service is running.
 
 ## Example Dialogue
 

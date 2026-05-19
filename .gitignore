@@ -3,3 +3,5 @@ SE-report/
 .codex/
 temp-skills/
 skills-lock.json
+data/state.local.json
+data/*.tmp

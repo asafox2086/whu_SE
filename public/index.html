@@ -157,6 +157,74 @@
         <p class="eyebrow">管理员模式</p>
         <h2>注册用户</h2>
         <div class="stack" data-admin-users></div>
+        <h2>新增机会</h2>
+        <div class="admin-editor-grid">
+          <form data-admin-competition-form>
+            <h3>新增竞赛</h3>
+            <label>
+              竞赛名称
+              <input name="title" required placeholder="蓝桥杯全国软件和信息技术专业人才大赛">
+            </label>
+            <label>
+              级别
+              <input name="level" required placeholder="国家级">
+            </label>
+            <label>
+              官网
+              <input name="officialUrl" type="url" required placeholder="https://example.com">
+            </label>
+            <label>
+              交流群
+              <input name="qqGroup" required placeholder="845678901">
+            </label>
+            <div class="form-grid">
+              <label>
+                开始时间
+                <input name="startDate" type="date" required>
+              </label>
+              <label>
+                结束时间
+                <input name="endDate" type="date" required>
+              </label>
+            </div>
+            <label>
+              简介
+              <textarea name="description" required placeholder="适合算法、软件开发和电子信息方向同学报名。"></textarea>
+            </label>
+            <button type="submit">新增竞赛</button>
+          </form>
+          <form data-admin-research-form>
+            <h3>新增科研项目</h3>
+            <label>
+              项目名称
+              <input name="title" required placeholder="多模态课程资源检索系统">
+            </label>
+            <label>
+              方向
+              <input name="direction" required placeholder="信息检索">
+            </label>
+            <label>
+              技术栈
+              <input name="techStack" required placeholder="Python, Vue, 向量数据库">
+            </label>
+            <label>
+              交流群
+              <input name="qqGroup" required placeholder="856789012">
+            </label>
+            <label>
+              状态
+              <select name="status">
+                <option value="招募中">招募中</option>
+                <option value="已结束">已结束</option>
+              </select>
+            </label>
+            <label>
+              简介
+              <textarea name="description" required placeholder="围绕课程资料构建可检索、可问答的原型系统。"></textarea>
+            </label>
+            <button type="submit">新增科研项目</button>
+          </form>
+        </div>
         <h2>数据库</h2>
         <div class="database-grid" data-admin-database></div>
       </section>

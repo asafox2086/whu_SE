@@ -1,6 +1,8 @@
 import {
   applyToResearchProject,
+  createCompetition,
   createInitialState,
+  createResearchProject,
   createTeamRecruit,
   deleteDatabaseRecord,
   DomainError,
@@ -25,6 +27,8 @@ const sessionKey = "xinggui_mvp_session_v1";
 let state = loadState();
 let session = loadSession();
 let selectedOpportunityType = "all";
+let serverStorageAvailable = false;
+let pendingStateSave = Promise.resolve();
 
 const selectors = {
   userBadge: document.querySelector("[data-user-badge]"),
@@ -42,6 +46,8 @@ const selectors = {
   certificateCollection: document.querySelector("[data-certificate-collection]"),
   adminUsers: document.querySelector("[data-admin-users]"),
   adminDatabase: document.querySelector("[data-admin-database]"),
+  adminCompetitionForm: document.querySelector("[data-admin-competition-form]"),
+  adminResearchForm: document.querySelector("[data-admin-research-form]"),
   mentorApplications: document.querySelector("[data-mentor-applications]"),
   feedbackForm: document.querySelector("[data-feedback-form]"),
   feedbackList: document.querySelector("[data-feedback-list]"),
@@ -57,8 +63,11 @@ selectors.researchApplyForm.addEventListener("submit", handleResearchApplySubmit
 selectors.certificateForm.addEventListener("submit", handleCertificateSubmit);
 selectors.feedbackForm.addEventListener("submit", handleFeedbackSubmit);
 selectors.adminDatabase.addEventListener("click", handleAdminDatabaseClick);
+selectors.adminCompetitionForm.addEventListener("submit", handleAdminCompetitionSubmit);
+selectors.adminResearchForm.addEventListener("submit", handleAdminResearchSubmit);
 
 render();
+hydrateStateFromServer();
 
 function handleAuthSubmit(event) {
   event.preventDefault();
@@ -210,6 +219,57 @@ function handleAdminDatabaseClick(event) {
     saveState();
     showToast("记录已删除");
     renderAdmin();
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleAdminCompetitionSubmit(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+
+  try {
+    requireSession();
+    const created = createCompetition(state, session.user.id, {
+      title: form.get("title"),
+      level: form.get("level"),
+      officialUrl: form.get("officialUrl"),
+      qqGroup: form.get("qqGroup"),
+      startDate: form.get("startDate"),
+      endDate: form.get("endDate"),
+      description: form.get("description")
+    });
+    state = created.state;
+    trackUsage("create_competition", created.competition.id);
+    saveState();
+    event.currentTarget.reset();
+    showToast("竞赛已新增");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleAdminResearchSubmit(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+
+  try {
+    requireSession();
+    const created = createResearchProject(state, session.user.id, {
+      title: form.get("title"),
+      direction: form.get("direction"),
+      techStack: form.get("techStack"),
+      qqGroup: form.get("qqGroup"),
+      description: form.get("description"),
+      status: form.get("status")
+    });
+    state = created.state;
+    trackUsage("create_research_project", created.researchProject.id);
+    saveState();
+    event.currentTarget.reset();
+    showToast("科研项目已新增");
     render();
   } catch (error) {
     showToast(error.message, true);
@@ -512,8 +572,35 @@ function loadState() {
     return createInitialState();
   }
 
+  return normalizeStoredState(JSON.parse(stored));
+}
+
+async function hydrateStateFromServer() {
+  try {
+    const response = await fetch("/api/state", {
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = await response.json();
+    serverStorageAvailable = true;
+    if (payload.source === "seed" && localStorage.getItem(storageKey)) {
+      queuePersistState();
+      return;
+    }
+
+    state = normalizeStoredState(payload.state);
+    localStorage.setItem(storageKey, JSON.stringify(state));
+    render();
+  } catch {
+    serverStorageAvailable = false;
+  }
+}
+
+function normalizeStoredState(parsed) {
   const defaults = createInitialState();
-  const parsed = JSON.parse(stored);
   return {
     ...defaults,
     ...parsed,
@@ -536,6 +623,32 @@ function saveAll() {
 
 function saveState() {
   localStorage.setItem(storageKey, JSON.stringify(state));
+  queuePersistState();
+}
+
+function queuePersistState() {
+  if (!serverStorageAvailable) {
+    return;
+  }
+
+  const snapshot = state;
+  pendingStateSave = pendingStateSave
+    .catch(() => {})
+    .then(() => persistStateToServer(snapshot))
+    .catch(() => {
+      showToast("本地数据文件保存失败，已暂存在浏览器", true);
+    });
+}
+
+async function persistStateToServer(snapshot) {
+  const response = await fetch("/api/state", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(snapshot)
+  });
+  if (!response.ok) {
+    throw new Error("本地数据文件保存失败");
+  }
 }
 
 function readFileDataUrl(file) {

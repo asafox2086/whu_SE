@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   applyToResearchProject,
+  createCompetition,
   createTeamRecruit,
   createInitialState,
+  createResearchProject,
   deleteDatabaseRecord,
   getAdminDatabaseView,
   getDatabaseSnapshot,
@@ -165,6 +167,78 @@ test("admin database view is readable and supports deleting competitions and res
   assert.equal(
     getDatabaseSnapshot(withoutResearch.state, admin.user.id).tables.researchProjects.length,
     0
+  );
+});
+
+test("admin usage records explain actions, users, and targets in readable language", () => {
+  const admin = registerUser(createInitialState(), {
+    role: "admin",
+    name: "管理员",
+    email: "admin-usage@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+  const student = registerUser(admin.state, {
+    role: "student",
+    name: "使用同学",
+    email: "usage@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const used = recordUsage(student.state, {
+    userId: student.user.id,
+    action: "view_opportunity",
+    target: "competition_1"
+  });
+
+  const view = getAdminDatabaseView(used.state, admin.user.id);
+  const usageTable = view.tables.find((table) => table.name === "usageEvents");
+
+  assert.equal(usageTable.records[0].title, "浏览机会");
+  assert.equal(usageTable.records[0].summary, "中国大学生服务外包创新创业大赛");
+  assert.deepEqual(usageTable.records[0].fields[0], {
+    label: "用户",
+    value: "使用同学 · 学生"
+  });
+  assert.deepEqual(usageTable.records[0].fields[1], {
+    label: "目标",
+    value: "中国大学生服务外包创新创业大赛"
+  });
+});
+
+test("admin can add competitions and research projects for the opportunity hall", () => {
+  const admin = registerUser(createInitialState(), {
+    role: "admin",
+    name: "管理员",
+    email: "admin-create@whu.edu.cn",
+    password: "Passw0rd!"
+  });
+
+  const withCompetition = createCompetition(admin.state, admin.user.id, {
+    title: "蓝桥杯全国软件和信息技术专业人才大赛",
+    level: "国家级",
+    officialUrl: "https://dasai.lanqiao.cn/",
+    qqGroup: "845678901",
+    startDate: "2026-06-15",
+    endDate: "2026-10-20",
+    description: "适合算法、软件开发和电子信息方向同学报名。"
+  });
+  const withResearch = createResearchProject(withCompetition.state, admin.user.id, {
+    title: "多模态课程资源检索系统",
+    direction: "信息检索",
+    techStack: "Python, Vue, 向量数据库",
+    qqGroup: "856789012",
+    description: "围绕课程资料构建可检索、可问答的原型系统。",
+    status: "招募中"
+  });
+
+  const opportunities = listOpportunities(withResearch.state);
+  assert.equal(withCompetition.competition.id, "competition_3");
+  assert.equal(withResearch.researchProject.id, "research_2");
+  assert.ok(
+    opportunities.some((opportunity) => opportunity.title === "蓝桥杯全国软件和信息技术专业人才大赛")
+  );
+  assert.ok(
+    opportunities.some((opportunity) => opportunity.title === "多模态课程资源检索系统")
   );
 });
 

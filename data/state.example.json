@@ -1,0 +1,43 @@
+{
+  "users": [],
+  "students": [],
+  "admins": [],
+  "mentors": [
+    {
+      "id": "mentor_1",
+      "userId": "user_mentor_1",
+      "name": "周老师",
+      "department": "计算机学院"
+    }
+  ],
+  "certificateCollectors": [],
+  "competitions": [
+    {
+      "id": "competition_1",
+      "title": "中国大学生服务外包创新创业大赛",
+      "level": "国家级",
+      "officialUrl": "https://www.fwwb.org.cn/",
+      "qqGroup": "812345678",
+      "startDate": "2026-05-20",
+      "endDate": "2026-07-10",
+      "description": "适合软件工程、产品设计和商业策划方向同学组队参赛。"
+    }
+  ],
+  "researchProjects": [
+    {
+      "id": "research_1",
+      "mentorId": "mentor_1",
+      "title": "面向校园服务的智能问答系统",
+      "direction": "自然语言处理",
+      "techStack": ["JavaScript", "向量检索", "RAG"],
+      "qqGroup": "834567890",
+      "description": "构建面向学生事务咨询的原型系统，招募前端与算法方向同学。",
+      "status": "招募中"
+    }
+  ],
+  "teamRecruits": [],
+  "applications": [],
+  "certificateRecords": [],
+  "usageEvents": [],
+  "feedbackEntries": []
+}

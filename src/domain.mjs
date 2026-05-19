@@ -194,6 +194,55 @@ export function listOpportunities(state, filters = {}) {
   });
 }
 
+export function createCompetition(state, adminUserId, payload) {
+  findAdminByUserId(state, adminUserId);
+  const next = cloneState(state);
+  const competition = {
+    id: nextId("competition", next.competitions),
+    title: requiredText(payload.title, "竞赛名称"),
+    level: requiredText(payload.level, "竞赛级别"),
+    officialUrl: requiredText(payload.officialUrl, "竞赛官网"),
+    qqGroup: requiredText(payload.qqGroup, "交流群"),
+    startDate: requiredText(payload.startDate, "开始时间"),
+    endDate: requiredText(payload.endDate, "结束时间"),
+    description: requiredText(payload.description, "竞赛简介")
+  };
+
+  next.competitions.push(competition);
+
+  return {
+    state: next,
+    competition
+  };
+}
+
+export function createResearchProject(state, adminUserId, payload) {
+  findAdminByUserId(state, adminUserId);
+  const next = cloneState(state);
+  const mentorId = optionalText(payload.mentorId, next.mentors[0]?.id ?? "");
+  if (!next.mentors.some((mentor) => mentor.id === mentorId)) {
+    throw new DomainError("导师不存在", "MENTOR_NOT_FOUND");
+  }
+
+  const researchProject = {
+    id: nextId("research", next.researchProjects),
+    mentorId,
+    title: requiredText(payload.title, "科研项目名称"),
+    direction: requiredText(payload.direction, "科研方向"),
+    techStack: normalizeTags(payload.techStack, "技术栈"),
+    qqGroup: requiredText(payload.qqGroup, "交流群"),
+    description: requiredText(payload.description, "科研项目简介"),
+    status: optionalText(payload.status, "招募中")
+  };
+
+  next.researchProjects.push(researchProject);
+
+  return {
+    state: next,
+    researchProject
+  };
+}
+
 export function createTeamRecruit(state, payload) {
   const next = cloneState(state);
   const competition = next.competitions.find((item) => item.id === payload.competitionId);
@@ -498,13 +547,15 @@ export function getAdminDatabaseView(state, adminUserId) {
     {
       name: "usageEvents",
       label: "使用记录",
-      records: usageEventsOf(state).map((event) =>
-        readableRecord(event.id, event.action, event.target || "无目标", [
-          ["用户ID", event.userId ?? "匿名"],
-          ["目标", event.target || "无"],
+      records: usageEventsOf(state).map((event) => {
+        const presented = presentUsageEvent(state, event);
+        return readableRecord(event.id, presented.actionLabel, presented.targetSummary, [
+          ["用户", presented.userSummary],
+          ["目标", presented.targetSummary],
+          ["动作", presented.actionLabel],
           ["时间", event.occurredAt]
-        ], true)
-      )
+        ], true);
+      })
     },
     {
       name: "feedbackEntries",
@@ -658,7 +709,15 @@ function normalizeTags(tags, label) {
 }
 
 function nextId(prefix, collection) {
-  return `${prefix}_${collection.length + 1}`;
+  const maxNumber = (collection ?? []).reduce((max, record) => {
+    const id = `${record.id ?? ""}`;
+    if (!id.startsWith(`${prefix}_`)) {
+      return max;
+    }
+    const number = Number(id.slice(prefix.length + 1));
+    return Number.isInteger(number) ? Math.max(max, number) : max;
+  }, 0);
+  return `${prefix}_${maxNumber + 1}`;
 }
 
 function readableRecord(id, title, summary, fields, canDelete = false) {
@@ -669,6 +728,107 @@ function readableRecord(id, title, summary, fields, canDelete = false) {
     fields: fields.map(([label, value]) => ({ label, value })),
     canDelete
   };
+}
+
+function presentUsageEvent(state, usageEvent) {
+  const user = usageEvent.userId
+    ? state.users.find((candidate) => candidate.id === usageEvent.userId)
+    : null;
+  return {
+    ...usageEvent,
+    actionLabel: usageActionLabel(usageEvent.action),
+    targetSummary: usageTargetSummary(state, usageEvent.target),
+    userSummary: user ? `${user.name} · ${roleLabel(user.role)}` : "匿名用户"
+  };
+}
+
+function usageActionLabel(action) {
+  const labels = {
+    view_opportunity: "浏览机会",
+    filter_opportunities: "筛选机会",
+    publish_team_recruit: "发布组队招募",
+    apply_research: "提交科研申请",
+    upload_certificate_record: "上传证书记录",
+    submit_feedback: "提交反馈",
+    create_competition: "新增竞赛",
+    create_research_project: "新增科研项目",
+    delete_database_record: "删除数据库记录"
+  };
+  return labels[action] ?? action;
+}
+
+function usageTargetSummary(state, target) {
+  const normalizedTarget = `${target ?? ""}`.trim();
+  if (!normalizedTarget) {
+    return "无目标";
+  }
+
+  const filterLabels = {
+    all: "全部机会",
+    competition: "竞赛机会",
+    research: "科研项目机会"
+  };
+  if (filterLabels[normalizedTarget]) {
+    return filterLabels[normalizedTarget];
+  }
+
+  const competition = state.competitions.find((item) => item.id === normalizedTarget);
+  if (competition) {
+    return competition.title;
+  }
+
+  const research = state.researchProjects.find((project) => project.id === normalizedTarget);
+  if (research) {
+    return research.title;
+  }
+
+  const recruit = state.teamRecruits.find((item) => item.id === normalizedTarget);
+  if (recruit) {
+    return recruit.title;
+  }
+
+  const application = state.applications.find((item) => item.id === normalizedTarget);
+  if (application) {
+    return application.researchTitle ?? usageApplicationTargetSummary(state, application);
+  }
+
+  const certificateRecord = certificateRecordsOf(state).find((item) => item.id === normalizedTarget);
+  if (certificateRecord) {
+    return presentCertificateRecord(state, certificateRecord).awardSummary;
+  }
+
+  const feedback = feedbackEntriesOf(state).find((item) => item.id === normalizedTarget);
+  if (feedback) {
+    return feedback.painPoint;
+  }
+
+  if (normalizedTarget.includes(":")) {
+    const [table, id] = normalizedTarget.split(":");
+    return `${databaseTableLabel(table)} · ${usageTargetSummary(state, id)}`;
+  }
+
+  return normalizedTarget;
+}
+
+function usageApplicationTargetSummary(state, application) {
+  if (application.targetType === "research") {
+    const research = state.researchProjects.find((project) => project.id === application.targetId);
+    return research ? `科研申请：${research.title}` : `科研申请：${application.targetId}`;
+  }
+  return `${application.targetType}:${application.targetId}`;
+}
+
+function databaseTableLabel(table) {
+  const labels = {
+    competitions: "竞赛",
+    researchProjects: "科研项目",
+    teamRecruits: "组队招募",
+    applications: "申请",
+    certificateRecords: "证书记录",
+    usageEvents: "使用记录",
+    feedbackEntries: "使用反馈"
+  };
+  return labels[table] ?? table;
 }
 
 function presentCertificateRecord(state, certificateRecord) {
