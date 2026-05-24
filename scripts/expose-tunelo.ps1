@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
+$cmdPath = (Get-Command cmd.exe -ErrorAction Stop).Source
 $localRelease = Join-Path $projectRoot "tools\tunelo\target\release\tunelo.exe"
 $localBinary = Join-Path $projectRoot "tools\tunelo\tunelo.exe"
 
@@ -59,11 +60,20 @@ if ($Password) {
   $tuneloArgs += "--password"
 }
 $tuneloArgs += "--"
-$tuneloArgs += "npm"
-$tuneloArgs += "start"
+$tuneloArgs += $cmdPath
+$tuneloArgs += "/d"
+$tuneloArgs += "/s"
+$tuneloArgs += "/c"
+$tuneloArgs += "npm start"
 
 Write-Host "Starting Xinggui MVP on port $Port through Tunelo..."
 Write-Host "Tunelo will print the Public URL when the tunnel is ready."
 Write-Host "Default mode is public HTTPS access. Everyone with the Public URL can use the same role choices as you."
 Write-Host "Look for: Public URL: https://..."
-& $TuneloPath @tuneloArgs
+$originalLocation = Get-Location
+Set-Location -LiteralPath $projectRoot
+try {
+  & $TuneloPath @tuneloArgs
+} finally {
+  Set-Location -LiteralPath $originalLocation
+}

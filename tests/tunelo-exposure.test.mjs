@@ -13,6 +13,8 @@ test("project has a repeatable Tunelo public preview command without tracking th
   assert.match(script, /port/);
   assert.match(script, /npm/);
   assert.match(script, /start/);
+  assert.match(script, /cmd\.exe/);
+  assert.match(script, /Set-Location/);
   assert.match(script, /Get-NetTCPConnection/);
   assert.match(script, /Public URL/);
   assert.match(readme, /Tunelo 公网预览/);
