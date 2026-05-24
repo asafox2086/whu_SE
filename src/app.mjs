@@ -28,6 +28,7 @@ import {
   recordUsage,
   registerUser,
   reviewResearchApplication,
+  resumeTeamRecruit,
   stopTeamRecruit,
   submitFeedback,
   unblockUser,
@@ -196,8 +197,17 @@ function handleRecruitManagementClick(event) {
       const updated = stopTeamRecruit(state, session.user.id, recruitId);
       state = updated.state;
       trackUsage("stop_team_recruit", recruitId);
-      showToast("招募已标记为不招了");
+      showToast("招募已结束");
+    } else if (action === "resume") {
+      const updated = resumeTeamRecruit(state, session.user.id, recruitId);
+      state = updated.state;
+      trackUsage("resume_team_recruit", recruitId);
+      showToast("招募已重新开启");
     } else if (action === "delete") {
+      const confirmed = window.confirm("确认删除这条组队招募吗？删除后无法恢复。");
+      if (!confirmed) {
+        return;
+      }
       const updated = deleteTeamRecruit(state, session.user.id, recruitId);
       state = updated.state;
       trackUsage("delete_team_recruit", recruitId);
@@ -660,19 +670,23 @@ function renderRecruitList(recruits) {
   return recruits
     .map(
       (recruit) => `
-        <section class="mini-card">
-          <div class="record-head">
-            <div>
+        <section class="mini-card recruit-card">
+          <div class="recruit-body">
+            <div class="recruit-main">
+              <span class="status-pill ${recruit.status === "招募中" ? "is-open" : "is-closed"}">${escapeHtml(recruit.status)}</span>
               <strong>${escapeHtml(recruit.title)}</strong>
-              <span>${escapeHtml(recruit.competitionTitle)} · ${escapeHtml(recruit.publisherName)} · ${escapeHtml(recruit.contact)}</span>
-              <small>${recruit.skills.map(escapeHtml).join(" / ")} · ${escapeHtml(recruit.status)}</small>
+              <span class="recruit-meta">${escapeHtml(recruit.competitionTitle)} · ${escapeHtml(recruit.publisherName)}</span>
+              <span class="recruit-contact">联系方式：${escapeHtml(recruit.contact)}</span>
+              <div class="recruit-tags">
+                ${recruit.skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join("")}
+              </div>
             </div>
             ${currentStudentId && recruit.studentId === currentStudentId
               ? `
                 <div class="button-row">
-                  ${recruit.status === "有效"
-                    ? `<button data-team-recruit-action="stop" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">标记不招了</button>`
-                    : ""}
+                  ${recruit.status === "招募中"
+                    ? `<button data-team-recruit-action="stop" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">结束招募</button>`
+                    : `<button data-team-recruit-action="resume" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">继续招募</button>`}
                   <button class="secondary" data-team-recruit-action="delete" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">删除</button>
                 </div>
               `

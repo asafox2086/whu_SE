@@ -30,6 +30,7 @@ import {
   listFeedbackEntries,
   recordUsage,
   reviewResearchApplication,
+  resumeTeamRecruit,
   registerUser,
   registerStudent,
   stopTeamRecruit,
@@ -426,7 +427,7 @@ test("student can delete their own uploaded certificate record", () => {
   assert.equal(listCertificateRecords(deleted.state, student.user.id).length, 0);
 });
 
-test("student can stop recruiting and delete their own team recruit", () => {
+test("student can end, resume, and delete their own team recruit", () => {
   const student = registerStudent(createInitialState(), {
     name: "队长同学",
     email: "recruit-owner@whu.edu.cn",
@@ -442,10 +443,14 @@ test("student can stop recruiting and delete their own team recruit", () => {
   });
 
   const stopped = stopTeamRecruit(created.state, student.user.id, created.recruit.id);
-  assert.equal(listTeamRecruitsForStudent(stopped.state, student.user.id)[0].status, "不招了");
+  assert.equal(listTeamRecruitsForStudent(stopped.state, student.user.id)[0].status, "已结束");
   assert.equal(getCompetitionDetail(stopped.state, "competition_1").teamRecruits.length, 0);
 
-  const deleted = deleteTeamRecruit(stopped.state, student.user.id, created.recruit.id);
+  const resumed = resumeTeamRecruit(stopped.state, student.user.id, created.recruit.id);
+  assert.equal(listTeamRecruitsForStudent(resumed.state, student.user.id)[0].status, "招募中");
+  assert.equal(getCompetitionDetail(resumed.state, "competition_1").teamRecruits.length, 1);
+
+  const deleted = deleteTeamRecruit(resumed.state, student.user.id, created.recruit.id);
   assert.equal(listTeamRecruitsForStudent(deleted.state, student.user.id).length, 0);
 });
 
@@ -531,12 +536,36 @@ test("student can publish a team recruit for an existing competition", () => {
     contact: "QQ 123456789"
   });
 
-  assert.equal(created.recruit.status, "有效");
+  assert.equal(created.recruit.status, "招募中");
   assert.equal(created.recruit.title, "寻找前端和答辩同学");
 
   const detail = getCompetitionDetail(created.state, "competition_1");
   assert.equal(detail.teamRecruits.length, 1);
   assert.equal(detail.teamRecruits[0].publisherName, "李队长");
+});
+
+test("legacy team recruit statuses are presented with the current wording", () => {
+  const student = registerStudent(createInitialState(), {
+    name: "旧数据同学",
+    email: "legacy-recruit@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const created = createTeamRecruit(student.state, {
+    competitionId: "competition_1",
+    studentUserId: student.user.id,
+    title: "兼容旧招募状态",
+    skills: ["测试"],
+    contact: "QQ 456456456"
+  });
+  created.state.teamRecruits[0].status = "有效";
+
+  assert.equal(listTeamRecruitsForStudent(created.state, student.user.id)[0].status, "招募中");
+  assert.equal(getCompetitionDetail(created.state, "competition_1").teamRecruits.length, 1);
+
+  created.state.teamRecruits[0].status = "不招了";
+  assert.equal(listTeamRecruitsForStudent(created.state, student.user.id)[0].status, "已结束");
+  assert.equal(getCompetitionDetail(created.state, "competition_1").teamRecruits.length, 0);
 });
 
 test("student can apply to an open research project and mentor can review it", () => {

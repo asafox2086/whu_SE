@@ -293,7 +293,7 @@ export function createTeamRecruit(state, payload) {
     skills,
     contact,
     publishTime: new Date().toISOString(),
-    status: "有效"
+    status: "招募中"
   };
 
   next.teamRecruits.push(recruit);
@@ -313,7 +313,7 @@ export function getCompetitionDetail(state, competitionId) {
   return {
     ...competition,
     teamRecruits: state.teamRecruits
-      .filter((recruit) => recruit.competitionId === competition.id && recruit.status === "有效")
+      .filter((recruit) => recruit.competitionId === competition.id && isOpenTeamRecruit(recruit))
       .map((recruit) => presentTeamRecruit(state, recruit))
   };
 }
@@ -336,7 +336,26 @@ export function stopTeamRecruit(state, studentUserId, recruitId) {
     throw new DomainError("只能操作自己发布的组队招募", "TEAM_RECRUIT_FORBIDDEN");
   }
 
-  recruit.status = "不招了";
+  recruit.status = "已结束";
+
+  return {
+    state: next,
+    recruit: presentTeamRecruit(next, recruit)
+  };
+}
+
+export function resumeTeamRecruit(state, studentUserId, recruitId) {
+  const student = findStudentByUserId(state, studentUserId);
+  const next = cloneState(state);
+  const recruit = next.teamRecruits.find((item) => item.id === recruitId);
+  if (!recruit) {
+    throw new DomainError("组队招募不存在", "TEAM_RECRUIT_NOT_FOUND");
+  }
+  if (recruit.studentId !== student.id) {
+    throw new DomainError("只能操作自己发布的组队招募", "TEAM_RECRUIT_FORBIDDEN");
+  }
+
+  recruit.status = "招募中";
 
   return {
     state: next,
@@ -1101,7 +1120,8 @@ function usageActionLabel(action) {
     view_opportunity: "浏览机会",
     filter_opportunities: "筛选机会",
     publish_team_recruit: "发布组队招募",
-    stop_team_recruit: "标记组队招募不招了",
+    stop_team_recruit: "结束组队招募",
+    resume_team_recruit: "重新开启组队招募",
     delete_team_recruit: "删除组队招募",
     apply_research: "提交科研申请",
     delete_research_application: "删除科研申请",
@@ -1261,9 +1281,24 @@ function presentTeamRecruit(state, recruit) {
   const competition = state.competitions.find((candidate) => candidate.id === recruit.competitionId);
   return {
     ...recruit,
+    status: normalizeTeamRecruitStatus(recruit.status),
     publisherName: user?.name ?? "未知学生",
     competitionTitle: competition?.title ?? "未知竞赛"
   };
+}
+
+function isOpenTeamRecruit(recruit) {
+  return normalizeTeamRecruitStatus(recruit.status) === "招募中";
+}
+
+function normalizeTeamRecruitStatus(status) {
+  if (status === "有效") {
+    return "招募中";
+  }
+  if (status === "不招了") {
+    return "已结束";
+  }
+  return status ?? "招募中";
 }
 
 function normalizeEmail(email) {

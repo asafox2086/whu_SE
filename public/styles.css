@@ -261,6 +261,63 @@ button.secondary {
   align-items: start;
 }
 
+.recruit-card {
+  padding: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbfb 100%);
+}
+
+.recruit-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.recruit-main {
+  display: grid;
+  gap: 8px;
+}
+
+.recruit-main strong {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.recruit-meta,
+.recruit-contact {
+  color: var(--muted);
+}
+
+.recruit-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recruit-tags span,
+.status-pill {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recruit-tags span {
+  color: var(--accent-strong);
+  background: #e9f6f6;
+}
+
+.status-pill {
+  color: var(--accent-strong);
+  background: #d7eeee;
+}
+
+.status-pill.is-closed {
+  color: #6a4a00;
+  background: #fff0c2;
+}
+
 .record-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -485,7 +542,8 @@ dd {
   }
 
   .project-row,
-  .record-head {
+  .record-head,
+  .recruit-body {
     grid-template-columns: 1fr;
   }
 }
