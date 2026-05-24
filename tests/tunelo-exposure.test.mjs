@@ -9,9 +9,14 @@ test("project has a repeatable Tunelo public preview command without tracking th
 
   assert.match(ignoreRules, /^tools\/tunelo\/$/m);
   assert.match(script, /tunelo/i);
+  assert.match(script, /https:\/\/tunelo\.net\/install\.ps1/);
   assert.match(script, /port/);
   assert.match(script, /npm/);
   assert.match(script, /start/);
+  assert.match(script, /Get-NetTCPConnection/);
+  assert.match(script, /Public URL/);
   assert.match(readme, /Tunelo 公网预览/);
   assert.match(readme, /scripts\/expose-tunelo\.ps1/);
+  assert.match(readme, /一行命令/);
+  assert.match(readme, /默认公开访问/);
 });

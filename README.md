@@ -47,16 +47,23 @@ $env:PORT=4300; npm start
 
 已验证 `jiweiyuan/tunelo` 适合这个 MVP：它可以用 `tunelo port 4173` 把本地 `npm start` 服务通过 `tunelo.net` 公共中继暴露成公网 URL。
 
-本地已将 Tunelo 源码 clone 到 `tools/tunelo/`，该目录已加入 `.gitignore`，不会提交到 GitHub。
+本地已将 Tunelo 源码 clone 到 `tools/tunelo/`，该目录已加入 `.gitignore`，不会提交到 GitHub。脚本找不到 `tunelo.exe` 时会自动运行官方 Windows 安装脚本。
 
-Windows PowerShell:
+Windows PowerShell 一行命令：
 
 ```powershell
-irm https://tunelo.net/install.ps1 | iex
+.\scripts\expose-tunelo.ps1
+```
+
+脚本路径是 `scripts/expose-tunelo.ps1`。它会自动选择可用端口并运行 `tunelo port <端口> -- npm start`，Tunelo 输出的 `Public URL: https://...` 就是可分享给其他人访问的地址。默认公开访问，所有拿到链接的人都能和你一样在网页里选择学生、导师、证书收集者或管理员等角色。
+
+需要指定端口时：
+
+```powershell
 .\scripts\expose-tunelo.ps1 -Port 4173
 ```
 
-脚本路径是 `scripts/expose-tunelo.ps1`。它会运行 `tunelo port 4173 -- npm start`，Tunelo 输出的 `Public URL` 就是可分享给其他人访问的地址。需要临时加访问密码时：
+需要临时加访问密码时：
 
 ```powershell
 .\scripts\expose-tunelo.ps1 -Port 4173 -Password
