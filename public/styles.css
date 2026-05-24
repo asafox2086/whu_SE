@@ -237,6 +237,25 @@ button.secondary {
   padding: 14px;
 }
 
+.item-card {
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.item-card:focus-within,
+.item-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 124, 128, 0.16);
+}
+
+.item-card.is-selected {
+  background: #f2fbfb;
+}
+
+.item-card.is-selected button[aria-current="true"] {
+  color: var(--accent-strong);
+  background: #d7eeee;
+}
+
 .project-row {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;

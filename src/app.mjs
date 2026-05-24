@@ -40,6 +40,8 @@ const sessionKey = "xinggui_mvp_session_v1";
 let state = loadState();
 let session = loadSession();
 let selectedOpportunityType = "all";
+let selectedOpportunityId = "";
+let selectedOpportunityDetailType = "";
 let serverStorageAvailable = false;
 let pendingStateSave = Promise.resolve();
 
@@ -151,6 +153,8 @@ function handleOpportunityClick(event) {
   const { opportunityId, opportunityType } = button.dataset;
   trackUsage("view_opportunity", opportunityId);
   renderOpportunityDetail(opportunityType, opportunityId);
+  renderOpportunities();
+  focusOpportunityDetail();
 }
 
 function handleRecruitSubmit(event) {
@@ -581,8 +585,11 @@ function renderOpportunities() {
 
   selectors.opportunityList.innerHTML = opportunities
     .map(
-      (opportunity) => `
-        <article class="item-card">
+      (opportunity) => {
+        const isSelected = opportunity.id === selectedOpportunityId
+          && opportunity.type === selectedOpportunityDetailType;
+        return `
+        <article class="item-card${isSelected ? " is-selected" : ""}" aria-current="${isSelected ? "true" : "false"}">
           <div>
             <span class="eyebrow">${opportunity.type === "competition" ? "竞赛" : "科研项目"}</span>
             <h3>${escapeHtml(opportunity.title)}</h3>
@@ -593,15 +600,21 @@ function renderOpportunities() {
           </div>
           <footer>
             <small>${escapeHtml(opportunity.subtitle)}</small>
-            <button data-opportunity-id="${opportunity.id}" data-opportunity-type="${opportunity.type}">查看</button>
+            <button data-opportunity-id="${opportunity.id}" data-opportunity-type="${opportunity.type}" aria-current="${isSelected ? "true" : "false"}">${isSelected ? "正在查看" : "查看"}</button>
           </footer>
         </article>
-      `
+      `;
+      }
     )
     .join("");
 }
 
 function renderOpportunityDetail(type, id) {
+  selectedOpportunityId = id;
+  selectedOpportunityDetailType = type;
+  selectors.detailPanel.setAttribute("tabindex", "-1");
+  selectors.detailPanel.setAttribute("aria-live", "polite");
+
   if (type === "competition") {
     const detail = getCompetitionDetail(state, id);
     selectors.detailPanel.innerHTML = `
@@ -632,6 +645,11 @@ function renderOpportunityDetail(type, id) {
     </dl>
   `;
   selectors.researchApplyForm.elements.researchId.value = id;
+}
+
+function focusOpportunityDetail() {
+  selectors.detailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  selectors.detailPanel.focus({ preventScroll: true });
 }
 
 function renderRecruitList(recruits) {
