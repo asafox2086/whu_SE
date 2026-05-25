@@ -17,6 +17,8 @@ test("opportunity hall renders paginated cards with numbered page controls", asy
   assert.match(app, /\.slice\(/);
   assert.match(app, /Math\.ceil/);
   assert.match(app, /selectedOpportunityPage = 1/);
+  assert.match(styles, /\.card-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.card-grid[\s\S]*grid-template-columns:\s*1fr/);
   assert.match(styles, /\.pagination/);
   assert.match(readme, /每页 6 条/);
 });
