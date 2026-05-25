@@ -44,7 +44,7 @@ let selectedOpportunityType = "all";
 let selectedOpportunityId = "";
 let selectedOpportunityDetailType = "";
 let selectedOpportunityPage = 1;
-const opportunityPageSize = 2;
+const opportunityPageSize = 6;
 let serverStorageAvailable = false;
 let pendingStateSave = Promise.resolve();
 

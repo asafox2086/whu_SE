@@ -9,7 +9,7 @@ test("opportunity hall renders paginated cards with numbered page controls", asy
   const readme = await readFile("README.md", "utf8");
 
   assert.match(html, /data-opportunity-pagination/);
-  assert.match(app, /opportunityPageSize/);
+  assert.match(app, /opportunityPageSize = 6/);
   assert.match(app, /selectedOpportunityPage/);
   assert.match(app, /handleOpportunityPageClick/);
   assert.match(app, /data-opportunity-page/);
@@ -18,5 +18,5 @@ test("opportunity hall renders paginated cards with numbered page controls", asy
   assert.match(app, /Math\.ceil/);
   assert.match(app, /selectedOpportunityPage = 1/);
   assert.match(styles, /\.pagination/);
-  assert.match(readme, /分页/);
+  assert.match(readme, /每页 6 条/);
 });
