@@ -219,10 +219,44 @@ button.secondary {
   background: #e9f6f6;
 }
 
+button:disabled {
+  border-color: var(--line);
+  color: #8b99a8;
+  background: #eef2f5;
+  cursor: not-allowed;
+}
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.page-numbers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pagination button {
+  min-width: 38px;
+  padding-inline: 12px;
+}
+
+.pagination button.is-active {
+  color: #fff;
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .item-card,
@@ -535,6 +569,15 @@ dd {
   .section-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-numbers {
+    justify-content: center;
   }
 
   .form-grid {

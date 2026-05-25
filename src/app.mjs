@@ -43,6 +43,8 @@ let session = loadSession();
 let selectedOpportunityType = "all";
 let selectedOpportunityId = "";
 let selectedOpportunityDetailType = "";
+let selectedOpportunityPage = 1;
+const opportunityPageSize = 2;
 let serverStorageAvailable = false;
 let pendingStateSave = Promise.resolve();
 
@@ -54,6 +56,7 @@ const selectors = {
   rolePanels: document.querySelectorAll("[data-role-panel]"),
   opportunityFilters: document.querySelector("[data-opportunity-filters]"),
   opportunityList: document.querySelector("[data-opportunity-list]"),
+  opportunityPagination: document.querySelector("[data-opportunity-pagination]"),
   detailPanel: document.querySelector("[data-detail-panel]"),
   recruitForm: document.querySelector("[data-recruit-form]"),
   studentRecruits: document.querySelector("[data-student-recruits]"),
@@ -78,6 +81,7 @@ selectors.authForm.addEventListener("submit", handleAuthSubmit);
 selectors.logoutButton.addEventListener("click", handleLogout);
 selectors.opportunityFilters.addEventListener("click", handleOpportunityFilter);
 selectors.opportunityList.addEventListener("click", handleOpportunityClick);
+selectors.opportunityPagination.addEventListener("click", handleOpportunityPageClick);
 selectors.recruitForm.addEventListener("submit", handleRecruitSubmit);
 selectors.detailPanel.addEventListener("click", handleRecruitManagementClick);
 selectors.studentRecruits.addEventListener("click", handleRecruitManagementClick);
@@ -142,7 +146,19 @@ function handleOpportunityFilter(event) {
     return;
   }
   selectedOpportunityType = button.dataset.type;
+  selectedOpportunityPage = 1;
   trackUsage("filter_opportunities", selectedOpportunityType);
+  renderOpportunities();
+}
+
+function handleOpportunityPageClick(event) {
+  const button = event.target.closest("button[data-opportunity-page]");
+  if (!button) {
+    return;
+  }
+
+  selectedOpportunityPage = Number(button.dataset.opportunityPage);
+  trackUsage("paginate_opportunities", selectedOpportunityPage);
   renderOpportunities();
 }
 
@@ -588,12 +604,16 @@ function renderOpportunities() {
     ? {}
     : { type: selectedOpportunityType };
   const opportunities = listOpportunities(state, filter);
+  const totalPages = Math.max(1, Math.ceil(opportunities.length / opportunityPageSize));
+  selectedOpportunityPage = Math.min(Math.max(selectedOpportunityPage, 1), totalPages);
+  const pageStart = (selectedOpportunityPage - 1) * opportunityPageSize;
+  const pagedOpportunities = opportunities.slice(pageStart, pageStart + opportunityPageSize);
 
   selectors.opportunityFilters.querySelectorAll("button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.type === selectedOpportunityType);
   });
 
-  selectors.opportunityList.innerHTML = opportunities
+  selectors.opportunityList.innerHTML = pagedOpportunities
     .map(
       (opportunity) => {
         const isSelected = opportunity.id === selectedOpportunityId
@@ -617,6 +637,32 @@ function renderOpportunities() {
       }
     )
     .join("");
+  renderOpportunityPagination(totalPages);
+}
+
+function renderOpportunityPagination(totalPages) {
+  if (totalPages <= 1) {
+    selectors.opportunityPagination.innerHTML = "";
+    return;
+  }
+
+  const pageButtons = Array.from({ length: totalPages }, (_, index) => {
+    const page = index + 1;
+    const isActive = page === selectedOpportunityPage;
+    return `
+      <button
+        class="${isActive ? "is-active" : "secondary"}"
+        data-opportunity-page="${page}"
+        ${isActive ? `aria-current="page"` : ""}
+      >${page}</button>
+    `;
+  }).join("");
+
+  selectors.opportunityPagination.innerHTML = `
+    <button class="secondary" data-opportunity-page="${Math.max(1, selectedOpportunityPage - 1)}" ${selectedOpportunityPage === 1 ? "disabled" : ""}>上一页</button>
+    <div class="page-numbers">${pageButtons}</div>
+    <button class="secondary" data-opportunity-page="${Math.min(totalPages, selectedOpportunityPage + 1)}" ${selectedOpportunityPage === totalPages ? "disabled" : ""}>下一页</button>
+  `;
 }
 
 function renderOpportunityDetail(type, id) {
