@@ -85,51 +85,18 @@
         <p>查看竞赛招募或科研申请入口。</p>
       </section>
 
-      <section class="student-action-grid" data-role-panel="student" data-app-panel data-page-panel="home" hidden>
-      <section class="panel action-panel">
-        <h2>发布组队招募</h2>
-        <form data-recruit-form>
-          <label>
-            目标机会
-            <select name="targetKey"></select>
-          </label>
-          <label>
-            标题
-            <input name="title" required placeholder="寻找前端和答辩同学">
-          </label>
-          <label>
-            技能标签
-            <input name="skills" required placeholder="Vue, PPT, 产品设计">
-          </label>
-          <label>
-            联系方式
-            <input name="contact" required placeholder="QQ 123456789">
-          </label>
-          <button type="submit">发布招募</button>
-        </form>
-        <h3>我的招募</h3>
-        <div class="stack" data-student-recruits></div>
-        <nav class="pagination compact-pagination" data-student-recruits-pagination aria-label="我的招募分页"></nav>
-      </section>
+      <section class="student-record-grid" data-role-panel="student" data-app-panel data-page-panel="home" hidden>
+        <section class="panel action-panel">
+          <h2>我的组队公告</h2>
+          <div class="stack" data-student-recruits></div>
+          <nav class="pagination compact-pagination" data-student-recruits-pagination aria-label="我的招募分页"></nav>
+        </section>
 
-      <section class="panel action-panel">
-        <h2>申请科研项目</h2>
-        <form data-research-apply-form>
-          <label>
-            科研项目
-            <select name="researchId"></select>
-          </label>
-          <label>
-            个人陈述
-            <textarea name="statement" required placeholder="写下你的相关经历和可投入时间"></textarea>
-          </label>
-          <button type="submit">提交申请</button>
-        </form>
-        <h3>我的申请结果</h3>
-        <div class="stack" data-student-applications></div>
-        <nav class="pagination compact-pagination" data-student-applications-pagination aria-label="我的申请分页"></nav>
-      </section>
-
+        <section class="panel action-panel">
+          <h2>我的科研申请</h2>
+          <div class="stack" data-student-applications></div>
+          <nav class="pagination compact-pagination" data-student-applications-pagination aria-label="我的申请分页"></nav>
+        </section>
       </section>
 
       <section class="panel certificate-panel" data-role-panel="student" data-app-panel data-page-panel="home" hidden>

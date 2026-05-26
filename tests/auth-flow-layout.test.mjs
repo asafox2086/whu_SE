@@ -27,4 +27,5 @@ test("app starts with a full login screen and hides it after authentication", as
   assert.match(styles, /\.layout\.is-auth-screen\s+\.auth-panel/);
   assert.match(styles, /\.layout\.is-logged-in/);
   assert.match(styles, /\.layout\.is-logged-in\s+\[data-app-panel\]/);
+  assert.match(styles, /\[hidden\]\s*\{[\s\S]*display:\s*none\s*!important/);
 });

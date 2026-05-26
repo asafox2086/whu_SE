@@ -66,10 +66,8 @@ const selectors = {
   opportunityList: document.querySelector("[data-opportunity-list]"),
   opportunityPagination: document.querySelector("[data-opportunity-pagination]"),
   detailPanel: document.querySelector("[data-detail-panel]"),
-  recruitForm: document.querySelector("[data-recruit-form]"),
   studentRecruits: document.querySelector("[data-student-recruits]"),
   studentRecruitsPagination: document.querySelector("[data-student-recruits-pagination]"),
-  researchApplyForm: document.querySelector("[data-research-apply-form]"),
   studentApplications: document.querySelector("[data-student-applications]"),
   studentApplicationsPagination: document.querySelector("[data-student-applications-pagination]"),
   certificateForm: document.querySelector("[data-certificate-form]"),
@@ -100,10 +98,8 @@ selectors.opportunityFilters.addEventListener("click", handleOpportunityFilter);
 selectors.opportunityList.addEventListener("click", handleOpportunityClick);
 selectors.opportunityPagination.addEventListener("click", handleOpportunityPageClick);
 selectors.appContent.addEventListener("click", handleListPageClick);
-selectors.recruitForm.addEventListener("submit", handleRecruitSubmit);
 selectors.detailPanel.addEventListener("click", handleRecruitManagementClick);
 selectors.studentRecruits.addEventListener("click", handleRecruitManagementClick);
-selectors.researchApplyForm.addEventListener("submit", handleResearchApplySubmit);
 selectors.studentApplications.addEventListener("click", handleStudentApplicationsClick);
 selectors.certificateForm.addEventListener("submit", handleCertificateSubmit);
 selectors.certificateList.addEventListener("click", handleCertificateListClick);
@@ -213,12 +209,6 @@ function handleOpportunityClick(event) {
   navigateToOpportunityDetail(opportunityType, opportunityId);
 }
 
-function handleRecruitSubmit(event) {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  submitTeamRecruit(event.currentTarget, parseOpportunityTargetKey(form.get("targetKey")));
-}
-
 function submitTeamRecruit(formElement, target) {
   try {
     requireSession();
@@ -308,12 +298,6 @@ function handleRecruitManagementClick(event) {
   } catch (error) {
     showToast(error.message, true);
   }
-}
-
-function handleResearchApplySubmit(event) {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  submitResearchApplication(event.currentTarget, form.get("researchId"));
 }
 
 function submitResearchApplication(formElement, researchId) {
@@ -1023,36 +1007,8 @@ function renderForms() {
   const competitionOptions = state.competitions
     .map((competition) => `<option value="${competition.id}">${escapeHtml(competition.title)}</option>`)
     .join("");
-  const researchOptions = state.researchProjects
-    .filter((project) => project.status === "招募中")
-    .map((project) => `<option value="${project.id}">${escapeHtml(project.title)}</option>`)
-    .join("");
 
-  selectors.recruitForm.elements.targetKey.innerHTML = renderOpportunityTargetOptions();
-  selectors.researchApplyForm.elements.researchId.innerHTML = researchOptions;
   selectors.certificateForm.elements.competitionId.innerHTML = competitionOptions;
-}
-
-function renderOpportunityTargetOptions() {
-  const competitionOptions = state.competitions
-    .map((competition) => `<option value="${opportunityTargetKey("competition", competition.id)}">[竞赛] ${escapeHtml(competition.title)}</option>`);
-  const researchOptions = state.researchProjects
-    .filter((project) => project.status === "招募中")
-    .map((project) => `<option value="${opportunityTargetKey("research", project.id)}">[科研] ${escapeHtml(project.title)}</option>`);
-
-  return [...competitionOptions, ...researchOptions].join("");
-}
-
-function opportunityTargetKey(type, id) {
-  return `${type}:${id}`;
-}
-
-function parseOpportunityTargetKey(value) {
-  const [type, ...idParts] = `${value ?? ""}`.split(":");
-  return {
-    type: type === "research" ? "research" : "competition",
-    id: idParts.join(":")
-  };
 }
 
 function opportunityRecruitPageKey(type, id) {
