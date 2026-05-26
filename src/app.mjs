@@ -14,6 +14,7 @@ import {
   DomainError,
   getAdminDatabaseView,
   getCompetitionDetail,
+  getResearchDetail,
   listCertificateCollection,
   listCertificateCollectionByCompetition,
   listCertificateRecords,
@@ -25,6 +26,7 @@ import {
   listResearchProjectsForMentor,
   listTeamRecruitsForStudent,
   login,
+  mergeDemoSeedState,
   recordUsage,
   registerUser,
   reviewResearchApplication,
@@ -44,6 +46,7 @@ let selectedOpportunityType = "all";
 let selectedOpportunityId = "";
 let selectedOpportunityDetailType = "";
 let selectedOpportunityPage = 1;
+let currentPage = "home";
 const opportunityPageSize = 6;
 const listPageSize = 5;
 let listPages = {};
@@ -113,7 +116,10 @@ selectors.adminResearchForm.addEventListener("submit", handleAdminResearchSubmit
 selectors.mentorResearchForm.addEventListener("submit", handleMentorResearchSubmit);
 selectors.mentorProjects.addEventListener("click", handleMentorProjectsClick);
 selectors.mentorApplications.addEventListener("submit", handleMentorApplicationReviewSubmit);
+selectors.detailPanel.addEventListener("submit", handleDetailPanelSubmit);
+window.addEventListener("hashchange", handleRouteChange);
 
+syncRouteFromLocation();
 render();
 hydrateStateFromServer();
 
@@ -151,8 +157,17 @@ function handleAuthSubmit(event) {
 function handleLogout() {
   session = null;
   localStorage.removeItem(sessionKey);
+  navigateHome();
   showToast("已切换为未登录状态");
   render();
+}
+
+function handleRouteChange() {
+  syncRouteFromLocation();
+  render();
+  if (currentPage === "opportunity-detail") {
+    focusOpportunityDetail();
+  }
 }
 
 function handleOpportunityFilter(event) {
@@ -195,19 +210,22 @@ function handleOpportunityClick(event) {
   }
   const { opportunityId, opportunityType } = button.dataset;
   trackUsage("view_opportunity", opportunityId);
-  renderOpportunityDetail(opportunityType, opportunityId);
-  renderOpportunities();
-  focusOpportunityDetail();
+  navigateToOpportunityDetail(opportunityType, opportunityId);
 }
 
 function handleRecruitSubmit(event) {
   event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  submitTeamRecruit(event.currentTarget, parseOpportunityTargetKey(form.get("targetKey")));
+}
 
+function submitTeamRecruit(formElement, target) {
   try {
     requireSession();
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const created = createTeamRecruit(state, {
-      competitionId: form.get("competitionId"),
+      targetType: target.type,
+      targetId: target.id,
       studentUserId: session.user.id,
       title: form.get("title"),
       skills: `${form.get("skills")}`.split(/[，,]/),
@@ -215,19 +233,43 @@ function handleRecruitSubmit(event) {
     });
     state = created.state;
     resetListPage("studentRecruits");
-    resetListPage(`competitionRecruits:${created.recruit.competitionId}`);
+    resetListPage(opportunityRecruitPageKey(created.recruit.targetType, created.recruit.targetId));
     trackUsage("publish_team_recruit", created.recruit.id);
     saveState();
-    event.currentTarget.reset();
+    formElement.reset();
     showToast("组队招募已发布");
     render();
-    renderOpportunityDetail("competition", form.get("competitionId"));
   } catch (error) {
     showToast(error.message, true);
   }
 }
 
+function handleDetailPanelSubmit(event) {
+  const recruitForm = event.target.closest("form[data-detail-recruit-form]");
+  if (recruitForm) {
+    event.preventDefault();
+    submitTeamRecruit(recruitForm, {
+      type: recruitForm.dataset.targetType,
+      id: recruitForm.dataset.targetId
+    });
+    return;
+  }
+
+  const researchApplyForm = event.target.closest("form[data-detail-research-apply-form]");
+  if (researchApplyForm) {
+    event.preventDefault();
+    submitResearchApplication(researchApplyForm, researchApplyForm.dataset.researchId);
+  }
+}
+
 function handleRecruitManagementClick(event) {
+  const backButton = event.target.closest("button[data-back-home]");
+  if (backButton) {
+    navigateHome();
+    render();
+    return;
+  }
+
   const button = event.target.closest("button[data-team-recruit-action]");
   if (!button) {
     return;
@@ -240,13 +282,13 @@ function handleRecruitManagementClick(event) {
     if (action === "stop") {
       const updated = stopTeamRecruit(state, session.user.id, recruitId);
       state = updated.state;
-      resetListPage(`competitionRecruits:${updated.recruit.competitionId}`);
+      resetListPage(opportunityRecruitPageKey(updated.recruit.targetType, updated.recruit.targetId));
       trackUsage("stop_team_recruit", recruitId);
       showToast("招募已结束");
     } else if (action === "resume") {
       const updated = resumeTeamRecruit(state, session.user.id, recruitId);
       state = updated.state;
-      resetListPage(`competitionRecruits:${updated.recruit.competitionId}`);
+      resetListPage(opportunityRecruitPageKey(updated.recruit.targetType, updated.recruit.targetId));
       trackUsage("resume_team_recruit", recruitId);
       showToast("招募已重新开启");
     } else if (action === "delete") {
@@ -257,15 +299,12 @@ function handleRecruitManagementClick(event) {
       const updated = deleteTeamRecruit(state, session.user.id, recruitId);
       state = updated.state;
       resetListPage("studentRecruits");
-      resetListPage(`competitionRecruits:${button.dataset.competitionId}`);
+      resetListPage(opportunityRecruitPageKey(button.dataset.targetType, button.dataset.targetId));
       trackUsage("delete_team_recruit", recruitId);
       showToast("招募已删除");
     }
     saveState();
     render();
-    if (session.user.role === "student") {
-      renderOpportunityDetail("competition", button.dataset.competitionId ?? "competition_1");
-    }
   } catch (error) {
     showToast(error.message, true);
   }
@@ -273,12 +312,16 @@ function handleRecruitManagementClick(event) {
 
 function handleResearchApplySubmit(event) {
   event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  submitResearchApplication(event.currentTarget, form.get("researchId"));
+}
 
+function submitResearchApplication(formElement, researchId) {
   try {
     requireSession();
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const applied = applyToResearchProject(state, {
-      researchId: form.get("researchId"),
+      researchId,
       studentUserId: session.user.id,
       statement: form.get("statement")
     });
@@ -287,7 +330,7 @@ function handleResearchApplySubmit(event) {
     resetListPage("mentorApplications");
     trackUsage("apply_research", applied.application.id);
     saveState();
-    event.currentTarget.reset();
+    formElement.reset();
     showToast("申请已提交，等待导师审核");
     render();
   } catch (error) {
@@ -645,8 +688,42 @@ function render() {
 }
 
 function renderSelectedOpportunityDetail() {
-  if (selectedOpportunityId && selectedOpportunityDetailType) {
+  if (currentPage === "opportunity-detail" && selectedOpportunityId && selectedOpportunityDetailType) {
     renderOpportunityDetail(selectedOpportunityDetailType, selectedOpportunityId);
+  }
+}
+
+function syncRouteFromLocation() {
+  const match = window.location.hash.match(/^#\/opportunities\/(competition|research)\/([^/?#]+)/);
+  if (!match) {
+    currentPage = "home";
+    return;
+  }
+
+  currentPage = "opportunity-detail";
+  selectedOpportunityDetailType = match[1];
+  selectedOpportunityId = decodeURIComponent(match[2]);
+}
+
+function navigateToOpportunityDetail(type, id) {
+  selectedOpportunityDetailType = type;
+  selectedOpportunityId = id;
+  currentPage = "opportunity-detail";
+  const nextHash = `#/opportunities/${type}/${encodeURIComponent(id)}`;
+  if (window.location.hash === nextHash) {
+    render();
+    focusOpportunityDetail();
+    return;
+  }
+  window.location.hash = nextHash;
+}
+
+function navigateHome() {
+  currentPage = "home";
+  selectedOpportunityId = "";
+  selectedOpportunityDetailType = "";
+  if (window.location.hash) {
+    window.location.hash = "#/";
   }
 }
 
@@ -659,9 +736,11 @@ function renderAuth() {
   selectors.authPanel.hidden = Boolean(session);
   selectors.appContent.classList.toggle("is-auth-screen", !session);
   selectors.appContent.classList.toggle("is-logged-in", Boolean(session));
+  selectors.appContent.classList.toggle("is-detail-page", currentPage === "opportunity-detail");
   selectors.appPanels.forEach((panel) => {
     const role = panel.dataset.rolePanel;
-    panel.hidden = !session || Boolean(role && role !== session.user.role);
+    const panelPage = panel.dataset.pagePanel ?? "home";
+    panel.hidden = !session || panelPage !== currentPage || Boolean(role && role !== session.user.role);
   });
   showInlineMessage(selectors.authMessage, null);
 }
@@ -683,10 +762,8 @@ function renderOpportunities() {
   selectors.opportunityList.innerHTML = pagedOpportunities
     .map(
       (opportunity) => {
-        const isSelected = opportunity.id === selectedOpportunityId
-          && opportunity.type === selectedOpportunityDetailType;
         return `
-        <article class="item-card${isSelected ? " is-selected" : ""}" aria-current="${isSelected ? "true" : "false"}">
+        <article class="item-card">
           <div>
             <span class="eyebrow">${opportunity.type === "competition" ? "竞赛" : "科研项目"}</span>
             <h3>${escapeHtml(opportunity.title)}</h3>
@@ -697,7 +774,7 @@ function renderOpportunities() {
           </div>
           <footer>
             <small>${escapeHtml(opportunity.subtitle)}</small>
-            <button data-opportunity-id="${opportunity.id}" data-opportunity-type="${opportunity.type}" aria-current="${isSelected ? "true" : "false"}">${isSelected ? "正在查看" : "查看"}</button>
+            <button data-opportunity-id="${opportunity.id}" data-opportunity-type="${opportunity.type}">查看</button>
           </footer>
         </article>
       `;
@@ -807,8 +884,10 @@ function renderOpportunityDetail(type, id) {
 
   if (type === "competition") {
     const detail = getCompetitionDetail(state, id);
-    const recruitsPage = paginateItems(detail.teamRecruits, `competitionRecruits:${id}`);
+    const pageKey = opportunityRecruitPageKey("competition", id);
+    const recruitsPage = paginateItems(detail.teamRecruits, pageKey);
     selectors.detailPanel.innerHTML = `
+      <button class="secondary" data-back-home type="button">返回机会大厅</button>
       <span class="eyebrow">竞赛详情</span>
       <h2>${escapeHtml(detail.title)}</h2>
       <p>${escapeHtml(detail.description)}</p>
@@ -817,26 +896,75 @@ function renderOpportunityDetail(type, id) {
         <div><dt>时间</dt><dd>${escapeHtml(detail.startDate)} 至 ${escapeHtml(detail.endDate)}</dd></div>
         <div><dt>交流群</dt><dd>${escapeHtml(detail.qqGroup)}</dd></div>
       </dl>
-      <h3>组队招募</h3>
+      ${renderDetailStudentActions("competition", id)}
+      <h3>所有人的组队公告</h3>
       ${renderRecruitList(recruitsPage.items)}
-      <nav class="pagination compact-pagination">${renderPagination(`competitionRecruits:${id}`, recruitsPage.totalPages, `${detail.title}组队招募`)}</nav>
+      <nav class="pagination compact-pagination">${renderPagination(pageKey, recruitsPage.totalPages, `${detail.title}组队公告`)}</nav>
     `;
-    selectors.recruitForm.elements.competitionId.value = id;
     return;
   }
 
-  const research = state.researchProjects.find((project) => project.id === id);
+  const research = getResearchDetail(state, id);
+  const pageKey = opportunityRecruitPageKey("research", id);
+  const recruitsPage = paginateItems(research.teamRecruits, pageKey);
   selectors.detailPanel.innerHTML = `
-    <span class="eyebrow">科研项目</span>
+    <button class="secondary" data-back-home type="button">返回机会大厅</button>
+    <span class="eyebrow">科研项目详情</span>
     <h2>${escapeHtml(research.title)}</h2>
     <p>${escapeHtml(research.description)}</p>
     <dl class="meta-grid">
       <div><dt>方向</dt><dd>${escapeHtml(research.direction)}</dd></div>
       <div><dt>技术栈</dt><dd>${research.techStack.map(escapeHtml).join(" / ")}</dd></div>
+      <div><dt>导师</dt><dd>${escapeHtml(research.mentorName)}</dd></div>
       <div><dt>状态</dt><dd>${escapeHtml(research.status)}</dd></div>
     </dl>
+    ${renderDetailStudentActions("research", id)}
+    <h3>所有人的组队公告</h3>
+    ${renderRecruitList(recruitsPage.items)}
+    <nav class="pagination compact-pagination">${renderPagination(pageKey, recruitsPage.totalPages, `${research.title}组队公告`)}</nav>
   `;
-  selectors.researchApplyForm.elements.researchId.value = id;
+}
+
+function renderDetailStudentActions(type, id) {
+  if (!session || session.user.role !== "student") {
+    return "";
+  }
+
+  const actionLabel = type === "competition" ? "为这个竞赛发布组队" : "为这个科研发布组队";
+  const applyForm = type === "research"
+    ? `
+      <form data-detail-research-apply-form data-research-id="${escapeHtml(id)}">
+        <h3>申请这个科研项目</h3>
+        <label>
+          个人陈述
+          <textarea name="statement" required placeholder="写下你的相关经历和可投入时间"></textarea>
+        </label>
+        <button type="submit">提交申请</button>
+      </form>
+    `
+    : "";
+
+  return `
+    <div class="detail-action-grid">
+      <form data-detail-recruit-form data-target-type="${escapeHtml(type)}" data-target-id="${escapeHtml(id)}">
+        <h3>${actionLabel}</h3>
+        <label>
+          标题
+          <input name="title" required placeholder="寻找前端、算法或答辩同学">
+        </label>
+        <label>
+          技能标签
+          <input name="skills" required placeholder="Vue, Python, PPT">
+        </label>
+        <label>
+          联系方式
+          <input name="contact" required placeholder="QQ 123456789">
+        </label>
+        <button type="submit">发布组队</button>
+      </form>
+      ${applyForm}
+    </div>
+  `;
 }
 
 function focusOpportunityDetail() {
@@ -851,13 +979,16 @@ function renderRecruitList(recruits) {
   const currentStudentId = getCurrentStudentId();
   return recruits
     .map(
-      (recruit) => `
+      (recruit) => {
+        const targetType = recruit.targetType ?? "competition";
+        const targetId = recruit.targetId ?? recruit.competitionId;
+        return `
         <section class="mini-card recruit-card">
           <div class="recruit-body">
             <div class="recruit-main">
               <span class="status-pill ${recruit.status === "招募中" ? "is-open" : "is-closed"}">${escapeHtml(recruit.status)}</span>
               <strong>${escapeHtml(recruit.title)}</strong>
-              <span class="recruit-meta">${escapeHtml(recruit.competitionTitle)} · ${escapeHtml(recruit.publisherName)}</span>
+              <span class="recruit-meta">${escapeHtml(recruit.targetLabel ?? "竞赛")} · ${escapeHtml(recruit.opportunityTitle ?? recruit.competitionTitle)} · ${escapeHtml(recruit.publisherName)}</span>
               <span class="recruit-contact">联系方式：${escapeHtml(recruit.contact)}</span>
               <div class="recruit-tags">
                 ${recruit.skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join("")}
@@ -867,15 +998,16 @@ function renderRecruitList(recruits) {
               ? `
                 <div class="button-row">
                   ${recruit.status === "招募中"
-                    ? `<button data-team-recruit-action="stop" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">结束招募</button>`
-                    : `<button data-team-recruit-action="resume" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">继续招募</button>`}
-                  <button class="secondary" data-team-recruit-action="delete" data-team-recruit-id="${escapeHtml(recruit.id)}" data-competition-id="${escapeHtml(recruit.competitionId)}">删除</button>
+                    ? `<button data-team-recruit-action="stop" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">结束招募</button>`
+                    : `<button data-team-recruit-action="resume" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">继续招募</button>`}
+                  <button class="secondary" data-team-recruit-action="delete" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">删除</button>
                 </div>
               `
               : ""}
           </div>
         </section>
-      `
+      `;
+      }
     )
     .join("");
 }
@@ -896,9 +1028,35 @@ function renderForms() {
     .map((project) => `<option value="${project.id}">${escapeHtml(project.title)}</option>`)
     .join("");
 
-  selectors.recruitForm.elements.competitionId.innerHTML = competitionOptions;
+  selectors.recruitForm.elements.targetKey.innerHTML = renderOpportunityTargetOptions();
   selectors.researchApplyForm.elements.researchId.innerHTML = researchOptions;
   selectors.certificateForm.elements.competitionId.innerHTML = competitionOptions;
+}
+
+function renderOpportunityTargetOptions() {
+  const competitionOptions = state.competitions
+    .map((competition) => `<option value="${opportunityTargetKey("competition", competition.id)}">[竞赛] ${escapeHtml(competition.title)}</option>`);
+  const researchOptions = state.researchProjects
+    .filter((project) => project.status === "招募中")
+    .map((project) => `<option value="${opportunityTargetKey("research", project.id)}">[科研] ${escapeHtml(project.title)}</option>`);
+
+  return [...competitionOptions, ...researchOptions].join("");
+}
+
+function opportunityTargetKey(type, id) {
+  return `${type}:${id}`;
+}
+
+function parseOpportunityTargetKey(value) {
+  const [type, ...idParts] = `${value ?? ""}`.split(":");
+  return {
+    type: type === "research" ? "research" : "competition",
+    id: idParts.join(":")
+  };
+}
+
+function opportunityRecruitPageKey(type, id) {
+  return `opportunityRecruits:${type}:${id}`;
 }
 
 function renderStudentRecruits() {
@@ -1273,15 +1431,7 @@ async function hydrateStateFromServer() {
 }
 
 function normalizeStoredState(parsed) {
-  const defaults = createInitialState();
-  return {
-    ...defaults,
-    ...parsed,
-    admins: parsed.admins ?? [],
-    certificateCollectors: parsed.certificateCollectors ?? [],
-    usageEvents: parsed.usageEvents ?? [],
-    feedbackEntries: parsed.feedbackEntries ?? []
-  };
+  return mergeDemoSeedState(parsed);
 }
 
 function loadSession() {

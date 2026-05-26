@@ -9,7 +9,7 @@ export class DomainError extends Error {
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function createInitialState() {
-  return {
+  return withDemoData({
     users: [],
     students: [],
     admins: [],
@@ -61,7 +61,180 @@ export function createInitialState() {
     certificateRecords: [],
     usageEvents: [],
     feedbackEntries: []
+  });
+}
+
+export function mergeDemoSeedState(state = {}) {
+  const demo = demoData();
+  const normalized = normalizeStateCollections(state);
+  if (Number(normalized.demoSeedVersion ?? 0) >= demo.demoSeedVersion) {
+    return normalized;
+  }
+  return mergeDemoData(normalized, demo);
+}
+
+function withDemoData(baseState) {
+  return mergeDemoData(normalizeStateCollections(baseState), demoData());
+}
+
+function demoData() {
+  const demoPasswordHash = hashPassword("Passw0rd!");
+  return {
+    demoSeedVersion: 2,
+    users: [
+      { id: "user_mentor_1", name: "周老师", email: "zhoumentor@whu.edu.cn", passwordHash: demoPasswordHash, role: "mentor", status: "正常" },
+      { id: "demo_user_01", name: "陈星", email: "chenxing@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_02", name: "李舟", email: "lizhou@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_03", name: "王雨", email: "wangyu@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_04", name: "赵明", email: "zhaoming@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_05", name: "钱芮", email: "qianrui@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_06", name: "孙琪", email: "sunqi@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_07", name: "周扬", email: "zhouyang@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_08", name: "吴桐", email: "wutong@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_09", name: "郑北", email: "zhengbei@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_10", name: "冯岚", email: "fenglan@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_11", name: "蒋一诺", email: "jiangyinuo@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_12", name: "唐可", email: "tangke@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
+      { id: "demo_user_14", name: "沈老师", email: "shenmentor@whu.edu.cn", passwordHash: demoPasswordHash, role: "mentor", status: "正常" },
+      { id: "demo_user_15", name: "刘老师", email: "liumentor@whu.edu.cn", passwordHash: demoPasswordHash, role: "mentor", status: "正常" },
+      { id: "demo_user_16", name: "材料收集员", email: "collector.demo@whu.edu.cn", passwordHash: demoPasswordHash, role: "certificate_collector", status: "正常" },
+      { id: "demo_user_17", name: "演示管理员", email: "admin.demo@whu.edu.cn", passwordHash: demoPasswordHash, role: "admin", status: "正常" }
+    ],
+    students: [
+      { id: "demo_student_01", userId: "demo_user_01", major: "软件工程", githubUrl: "https://github.com/demo-chenxing" },
+      { id: "demo_student_02", userId: "demo_user_02", major: "计算机科学", githubUrl: "https://github.com/demo-lizhou" },
+      { id: "demo_student_03", userId: "demo_user_03", major: "信息安全", githubUrl: "https://github.com/demo-wangyu" },
+      { id: "demo_student_04", userId: "demo_user_04", major: "人工智能", githubUrl: "" },
+      { id: "demo_student_05", userId: "demo_user_05", major: "软件工程", githubUrl: "" },
+      { id: "demo_student_06", userId: "demo_user_06", major: "数据科学", githubUrl: "" },
+      { id: "demo_student_07", userId: "demo_user_07", major: "计算机科学", githubUrl: "" },
+      { id: "demo_student_08", userId: "demo_user_08", major: "软件工程", githubUrl: "" },
+      { id: "demo_student_09", userId: "demo_user_09", major: "信息管理", githubUrl: "" },
+      { id: "demo_student_10", userId: "demo_user_10", major: "人工智能", githubUrl: "" },
+      { id: "demo_student_11", userId: "demo_user_11", major: "软件工程", githubUrl: "" },
+      { id: "demo_student_12", userId: "demo_user_12", major: "数字媒体技术", githubUrl: "" }
+    ],
+    admins: [
+      { id: "demo_admin_01", userId: "demo_user_17", name: "演示管理员" }
+    ],
+    mentors: [
+      { id: "demo_mentor_02", userId: "demo_user_14", name: "沈老师", department: "软件工程国家重点实验室" },
+      { id: "demo_mentor_03", userId: "demo_user_15", name: "刘老师", department: "人工智能学院" }
+    ],
+    certificateCollectors: [
+      { id: "demo_collector_01", userId: "demo_user_16", name: "材料收集员" }
+    ],
+    competitions: [
+      { id: "demo_competition_03", title: "蓝桥杯全国软件和信息技术专业人才大赛", level: "国家级", officialUrl: "https://dasai.lanqiao.cn/", qqGroup: "845678901", startDate: "2026-06-12", endDate: "2026-08-20", description: "算法、Web 开发和嵌入式方向同学可以报名练习与参赛。" },
+      { id: "demo_competition_04", title: "武汉大学校园黑客松", level: "校级", officialUrl: "https://example.whu.edu.cn/hackathon", qqGroup: "856789012", startDate: "2026-05-28", endDate: "2026-06-09", description: "48 小时完成一个能演示的校园服务原型，重视产品闭环。" },
+      { id: "demo_competition_05", title: "中国国际大学生创新大赛", level: "省部级", officialUrl: "https://cy.ncss.cn/", qqGroup: "867890123", startDate: "2026-06-15", endDate: "2026-10-10", description: "面向创新创业项目，适合已有原型和商业计划的团队。" }
+    ],
+    researchProjects: [
+      { id: "demo_research_02", mentorId: "demo_mentor_02", title: "多模态课程资源检索系统", direction: "信息检索", techStack: ["Python", "Vue", "向量数据库"], qqGroup: "878901234", description: "整理课程 PDF、视频字幕和实验材料，构建可检索、可问答的资源库。", status: "招募中" },
+      { id: "demo_research_03", mentorId: "demo_mentor_02", title: "可信软件测试工具", direction: "软件工程", techStack: ["TypeScript", "Playwright", "静态分析"], qqGroup: "889012345", description: "围绕课程项目构建自动化测试与质量分析工具。", status: "招募中" },
+      { id: "demo_research_04", mentorId: "demo_mentor_03", title: "校园低碳出行数据分析", direction: "数据挖掘", techStack: ["Python", "Pandas", "可视化"], qqGroup: "890123456", description: "基于匿名出行数据分析校园低碳行为并制作可视化看板。", status: "招募中" }
+    ],
+    teamRecruits: [
+      { id: "demo_recruit_01", targetType: "competition", targetId: "competition_1", competitionId: "competition_1", studentId: "demo_student_01", title: "寻找前端和答辩同学", skills: ["Vue", "PPT", "产品"], contact: "QQ 120001", publishTime: "2026-05-21T09:00:00.000Z", status: "招募中" },
+      { id: "demo_recruit_02", targetType: "competition", targetId: "competition_1", competitionId: "competition_1", studentId: "demo_student_02", title: "后端接口还差一位", skills: ["Node.js", "数据库"], contact: "QQ 120002", publishTime: "2026-05-21T12:00:00.000Z", status: "招募中" },
+      { id: "demo_recruit_03", targetType: "competition", targetId: "competition_2", competitionId: "competition_2", studentId: "demo_student_03", title: "挑战杯论文与实验组队", skills: ["论文", "实验设计"], contact: "QQ 120003", publishTime: "2026-05-22T08:30:00.000Z", status: "招募中" },
+      { id: "demo_recruit_04", targetType: "competition", targetId: "demo_competition_03", competitionId: "demo_competition_03", studentId: "demo_student_04", title: "蓝桥杯刷题小队", skills: ["C++", "算法"], contact: "QQ 120004", publishTime: "2026-05-22T14:30:00.000Z", status: "招募中" },
+      { id: "demo_recruit_05", targetType: "competition", targetId: "demo_competition_04", competitionId: "demo_competition_04", studentId: "demo_student_05", title: "黑客松缺 UI 和后端", skills: ["Figma", "Java"], contact: "QQ 120005", publishTime: "2026-05-23T10:20:00.000Z", status: "招募中" },
+      { id: "demo_recruit_06", targetType: "competition", targetId: "demo_competition_05", competitionId: "demo_competition_05", studentId: "demo_student_06", title: "创新大赛商业计划搭档", skills: ["商业计划", "调研"], contact: "QQ 120006", publishTime: "2026-05-23T16:40:00.000Z", status: "招募中" },
+      { id: "demo_recruit_07", targetType: "research", targetId: "research_1", researchId: "research_1", studentId: "demo_student_07", title: "RAG 评测和数据清洗组队", skills: ["RAG", "评测"], contact: "QQ 120007", publishTime: "2026-05-24T09:10:00.000Z", status: "招募中" },
+      { id: "demo_recruit_08", targetType: "research", targetId: "demo_research_02", researchId: "demo_research_02", studentId: "demo_student_08", title: "课程资源检索前端搭子", skills: ["Vue", "交互"], contact: "QQ 120008", publishTime: "2026-05-24T11:10:00.000Z", status: "招募中" },
+      { id: "demo_recruit_09", targetType: "research", targetId: "demo_research_03", researchId: "demo_research_03", studentId: "demo_student_09", title: "自动化测试脚本协作", skills: ["Playwright", "测试"], contact: "QQ 120009", publishTime: "2026-05-24T15:10:00.000Z", status: "招募中" },
+      { id: "demo_recruit_10", targetType: "research", targetId: "demo_research_04", researchId: "demo_research_04", studentId: "demo_student_10", title: "低碳出行可视化组队", skills: ["Pandas", "ECharts"], contact: "QQ 120010", publishTime: "2026-05-25T09:10:00.000Z", status: "招募中" },
+      { id: "demo_recruit_11", targetType: "competition", targetId: "demo_competition_04", competitionId: "demo_competition_04", studentId: "demo_student_11", title: "黑客松原型已结束招募", skills: ["原型", "演示"], contact: "QQ 120011", publishTime: "2026-05-20T19:10:00.000Z", status: "已结束" }
+    ],
+    applications: [
+      { id: "demo_application_01", targetType: "research", targetId: "demo_research_02", studentId: "demo_student_01", statement: "做过课程资料检索小工具，希望负责前端和数据标注。", applyTime: "2026-05-22T09:00:00.000Z", status: "待审核" },
+      { id: "demo_application_02", targetType: "research", targetId: "demo_research_02", studentId: "demo_student_02", statement: "熟悉 Python 和文本处理，可以参与向量化流程。", applyTime: "2026-05-22T10:00:00.000Z", status: "已通过", mentorContact: "QQ群 878901234，备注课程检索", mentorFeedback: "基础匹配，先加入群沟通任务。" },
+      { id: "demo_application_03", targetType: "research", targetId: "demo_research_03", studentId: "demo_student_03", statement: "做过 Playwright E2E 测试，想继续做工具链。", applyTime: "2026-05-23T09:00:00.000Z", status: "待审核" },
+      { id: "demo_application_04", targetType: "research", targetId: "demo_research_03", studentId: "demo_student_04", statement: "对静态分析感兴趣，有 JavaScript 项目经验。", applyTime: "2026-05-23T11:00:00.000Z", status: "未通过", mentorContact: "", mentorFeedback: "本轮更需要测试框架经验，可以补充项目后再投。" },
+      { id: "demo_application_05", targetType: "research", targetId: "demo_research_04", studentId: "demo_student_05", statement: "会 Pandas 和可视化，想做数据清洗。", applyTime: "2026-05-24T09:30:00.000Z", status: "待审核" },
+      { id: "demo_application_06", targetType: "research", targetId: "demo_research_04", studentId: "demo_student_06", statement: "参与过数据分析课程项目，可以负责图表。", applyTime: "2026-05-24T13:30:00.000Z", status: "已通过", mentorContact: "QQ群 890123456，备注低碳出行", mentorFeedback: "可先负责指标口径和看板草图。" }
+    ],
+    usageEvents: [
+      { id: "demo_usage_01", userId: "demo_user_01", action: "view_opportunity", target: "competition_1", occurredAt: "2026-05-21T09:05:00.000Z" },
+      { id: "demo_usage_02", userId: "demo_user_02", action: "view_opportunity", target: "competition_1", occurredAt: "2026-05-21T09:08:00.000Z" },
+      { id: "demo_usage_03", userId: "demo_user_03", action: "filter_opportunities", target: "competition", occurredAt: "2026-05-21T09:12:00.000Z" },
+      { id: "demo_usage_04", userId: "demo_user_04", action: "publish_team_recruit", target: "demo_recruit_04", occurredAt: "2026-05-22T14:31:00.000Z" },
+      { id: "demo_usage_05", userId: "demo_user_05", action: "publish_team_recruit", target: "demo_recruit_05", occurredAt: "2026-05-23T10:21:00.000Z" },
+      { id: "demo_usage_06", userId: "demo_user_06", action: "publish_team_recruit", target: "demo_recruit_06", occurredAt: "2026-05-23T16:41:00.000Z" },
+      { id: "demo_usage_07", userId: "demo_user_07", action: "view_opportunity", target: "research_1", occurredAt: "2026-05-24T09:01:00.000Z" },
+      { id: "demo_usage_08", userId: "demo_user_08", action: "apply_research", target: "demo_application_01", occurredAt: "2026-05-24T09:03:00.000Z" },
+      { id: "demo_usage_09", userId: "demo_user_09", action: "paginate_opportunities", target: "2", occurredAt: "2026-05-24T10:00:00.000Z" },
+      { id: "demo_usage_10", userId: "demo_user_10", action: "view_opportunity", target: "demo_research_04", occurredAt: "2026-05-24T10:20:00.000Z" },
+      { id: "demo_usage_11", userId: "demo_user_11", action: "filter_opportunities", target: "research", occurredAt: "2026-05-24T11:20:00.000Z" },
+      { id: "demo_usage_12", userId: "demo_user_12", action: "view_opportunity", target: "demo_competition_04", occurredAt: "2026-05-24T13:20:00.000Z" },
+      { id: "demo_usage_13", userId: "demo_user_14", action: "review_research_application", target: "demo_application_02", occurredAt: "2026-05-24T16:20:00.000Z" },
+      { id: "demo_usage_14", userId: "demo_user_15", action: "review_research_application", target: "demo_application_06", occurredAt: "2026-05-24T17:20:00.000Z" },
+      { id: "demo_usage_15", userId: "demo_user_17", action: "create_competition", target: "demo_competition_04", occurredAt: "2026-05-25T09:00:00.000Z" },
+      { id: "demo_usage_16", userId: "demo_user_17", action: "create_research_project", target: "demo_research_04", occurredAt: "2026-05-25T09:10:00.000Z" },
+      { id: "demo_usage_17", userId: "demo_user_01", action: "paginate_list", target: "studentRecruits", occurredAt: "2026-05-25T10:10:00.000Z" },
+      { id: "demo_usage_18", userId: "demo_user_03", action: "view_opportunity", target: "competition_2", occurredAt: "2026-05-25T10:40:00.000Z" }
+    ]
   };
+}
+
+function normalizeStateCollections(state) {
+  return {
+    ...state,
+    users: state.users ?? [],
+    students: state.students ?? [],
+    admins: state.admins ?? [],
+    mentors: state.mentors ?? [],
+    certificateCollectors: state.certificateCollectors ?? [],
+    competitions: state.competitions ?? [],
+    researchProjects: state.researchProjects ?? [],
+    teamRecruits: normalizeTeamRecruitRecords(state.teamRecruits ?? []),
+    applications: state.applications ?? [],
+    certificateRecords: state.certificateRecords ?? [],
+    usageEvents: state.usageEvents ?? [],
+    feedbackEntries: state.feedbackEntries ?? []
+  };
+}
+
+function mergeDemoData(state, demo) {
+  return normalizeStateCollections({
+    ...state,
+    demoSeedVersion: demo.demoSeedVersion,
+    users: mergeRecordsById(state.users, demo.users),
+    students: mergeRecordsById(state.students, demo.students),
+    admins: mergeRecordsById(state.admins, demo.admins),
+    mentors: mergeRecordsById(state.mentors, demo.mentors),
+    certificateCollectors: mergeRecordsById(state.certificateCollectors, demo.certificateCollectors),
+    competitions: mergeRecordsById(state.competitions, demo.competitions),
+    researchProjects: mergeRecordsById(state.researchProjects, demo.researchProjects),
+    teamRecruits: mergeRecordsById(state.teamRecruits, demo.teamRecruits),
+    applications: mergeRecordsById(state.applications, demo.applications),
+    usageEvents: mergeRecordsById(state.usageEvents, demo.usageEvents)
+  });
+}
+
+function mergeRecordsById(existing = [], additions = []) {
+  const records = new Map(existing.map((record) => [record.id, record]));
+  additions.forEach((record) => {
+    if (!records.has(record.id)) {
+      records.set(record.id, record);
+    }
+  });
+  return [...records.values()];
+}
+
+function normalizeTeamRecruitRecords(recruits = []) {
+  return recruits.map((recruit) => {
+    const targetType = recruit.targetType ?? (recruit.researchId ? "research" : "competition");
+    const targetId = recruit.targetId ?? recruit.researchId ?? recruit.competitionId;
+    return {
+      ...recruit,
+      targetType,
+      targetId,
+      competitionId: targetType === "competition" ? targetId : recruit.competitionId,
+      researchId: targetType === "research" ? targetId : recruit.researchId
+    };
+  });
 }
 
 export function registerStudent(state, payload) {
@@ -267,6 +440,9 @@ export function deleteResearchProject(state, mentorUserId, researchId) {
   next.applications = next.applications.filter(
     (application) => !(application.targetType === "research" && application.targetId === researchId)
   );
+  next.teamRecruits = next.teamRecruits.filter(
+    (recruit) => !isRecruitForTarget(recruit, "research", researchId)
+  );
 
   return {
     state: next
@@ -275,10 +451,7 @@ export function deleteResearchProject(state, mentorUserId, researchId) {
 
 export function createTeamRecruit(state, payload) {
   const next = cloneState(state);
-  const competition = next.competitions.find((item) => item.id === payload.competitionId);
-  if (!competition) {
-    throw new DomainError("竞赛不存在", "COMPETITION_NOT_FOUND");
-  }
+  const target = resolveTeamRecruitTarget(next, payload);
 
   const student = findStudentByUserId(next, payload.studentUserId);
   const title = requiredText(payload.title, "招募标题");
@@ -287,7 +460,10 @@ export function createTeamRecruit(state, payload) {
 
   const recruit = {
     id: nextId("recruit", next.teamRecruits),
-    competitionId: competition.id,
+    targetType: target.type,
+    targetId: target.id,
+    competitionId: target.type === "competition" ? target.id : "",
+    researchId: target.type === "research" ? target.id : "",
     studentId: student.id,
     title,
     skills,
@@ -313,7 +489,21 @@ export function getCompetitionDetail(state, competitionId) {
   return {
     ...competition,
     teamRecruits: state.teamRecruits
-      .filter((recruit) => recruit.competitionId === competition.id && isOpenTeamRecruit(recruit))
+      .filter((recruit) => isRecruitForTarget(recruit, "competition", competition.id) && isOpenTeamRecruit(recruit))
+      .map((recruit) => presentTeamRecruit(state, recruit))
+  };
+}
+
+export function getResearchDetail(state, researchId) {
+  const research = state.researchProjects.find((item) => item.id === researchId);
+  if (!research) {
+    throw new DomainError("科研项目不存在", "RESEARCH_NOT_FOUND");
+  }
+
+  return {
+    ...presentResearchProject(state, research),
+    teamRecruits: state.teamRecruits
+      .filter((recruit) => isRecruitForTarget(recruit, "research", research.id) && isOpenTeamRecruit(recruit))
       .map((recruit) => presentTeamRecruit(state, recruit))
   };
 }
@@ -760,14 +950,15 @@ export function getAdminDatabaseView(state, adminUserId) {
     {
       name: "teamRecruits",
       label: "组队招募",
-      records: state.teamRecruits.map((recruit) =>
-        readableRecord(recruit.id, recruit.title, `${recruit.status} · ${recruit.contact}`, [
-          ["竞赛ID", recruit.competitionId],
+      records: state.teamRecruits.map((recruit) => {
+        const presented = presentTeamRecruit(state, recruit);
+        return readableRecord(recruit.id, recruit.title, `${presented.status} · ${presented.contact}`, [
+          ["目标", `${presented.targetLabel} · ${presented.opportunityTitle}`],
           ["技能", recruit.skills.join(" / ")],
           ["联系方式", recruit.contact],
-          ["状态", recruit.status]
-        ], true)
-      )
+          ["状态", presented.status]
+        ], true);
+      })
     },
     {
       name: "applications",
@@ -844,13 +1035,14 @@ export function deleteDatabaseRecord(state, adminUserId, payload) {
   const next = cloneState(state);
   next[table] = (next[table] ?? []).filter((record) => record.id !== id);
   if (table === "competitions") {
-    next.teamRecruits = next.teamRecruits.filter((record) => record.competitionId !== id);
+    next.teamRecruits = next.teamRecruits.filter((record) => !isRecruitForTarget(record, "competition", id));
     next.certificateRecords = certificateRecordsOf(next).filter((record) => record.competitionId !== id);
   }
   if (table === "researchProjects") {
     next.applications = next.applications.filter(
       (record) => !(record.targetType === "research" && record.targetId === id)
     );
+    next.teamRecruits = next.teamRecruits.filter((record) => !isRecruitForTarget(record, "research", id));
   }
   return {
     state: next
@@ -1280,17 +1472,74 @@ function presentApplication(state, application) {
 function presentTeamRecruit(state, recruit) {
   const student = state.students.find((candidate) => candidate.id === recruit.studentId);
   const user = state.users.find((candidate) => candidate.id === student?.userId);
-  const competition = state.competitions.find((candidate) => candidate.id === recruit.competitionId);
+  const targetType = teamRecruitTargetType(recruit);
+  const targetId = teamRecruitTargetId(recruit);
+  const competition = targetType === "competition"
+    ? state.competitions.find((candidate) => candidate.id === targetId)
+    : null;
+  const research = targetType === "research"
+    ? state.researchProjects.find((candidate) => candidate.id === targetId)
+    : null;
+  const opportunityTitle = competition?.title ?? research?.title ?? "未知机会";
   return {
     ...recruit,
+    targetType,
+    targetId,
+    competitionId: targetType === "competition" ? targetId : recruit.competitionId,
+    researchId: targetType === "research" ? targetId : recruit.researchId,
     status: normalizeTeamRecruitStatus(recruit.status),
     publisherName: user?.name ?? "未知学生",
-    competitionTitle: competition?.title ?? "未知竞赛"
+    opportunityTitle,
+    targetLabel: targetType === "competition" ? "竞赛" : "科研项目",
+    competitionTitle: competition?.title ?? opportunityTitle
   };
 }
 
 function isOpenTeamRecruit(recruit) {
   return normalizeTeamRecruitStatus(recruit.status) === "招募中";
+}
+
+function resolveTeamRecruitTarget(state, payload) {
+  const targetType = payload.targetType ?? (payload.researchId ? "research" : "competition");
+  const targetId = requiredText(
+    payload.targetId ?? payload.researchId ?? payload.competitionId,
+    targetType === "research" ? "科研项目" : "竞赛"
+  );
+
+  if (targetType === "research") {
+    const research = state.researchProjects.find((item) => item.id === targetId);
+    if (!research) {
+      throw new DomainError("科研项目不存在", "RESEARCH_NOT_FOUND");
+    }
+    if (research.status !== "招募中") {
+      throw new DomainError("项目已停止招募", "RESEARCH_CLOSED");
+    }
+    return {
+      type: "research",
+      id: research.id
+    };
+  }
+
+  const competition = state.competitions.find((item) => item.id === targetId);
+  if (!competition) {
+    throw new DomainError("竞赛不存在", "COMPETITION_NOT_FOUND");
+  }
+  return {
+    type: "competition",
+    id: competition.id
+  };
+}
+
+function isRecruitForTarget(recruit, targetType, targetId) {
+  return teamRecruitTargetType(recruit) === targetType && teamRecruitTargetId(recruit) === targetId;
+}
+
+function teamRecruitTargetType(recruit) {
+  return recruit.targetType ?? (recruit.researchId ? "research" : "competition");
+}
+
+function teamRecruitTargetId(recruit) {
+  return recruit.targetId ?? recruit.researchId ?? recruit.competitionId;
 }
 
 function normalizeTeamRecruitStatus(status) {

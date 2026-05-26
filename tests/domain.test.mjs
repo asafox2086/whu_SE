@@ -17,6 +17,7 @@ import {
   getAdminDatabaseView,
   getDatabaseSnapshot,
   getCompetitionDetail,
+  getResearchDetail,
   listRegisteredUsers,
   listCertificateRecords,
   listCertificateCollection,
@@ -41,22 +42,33 @@ import {
 test("student can register and then log in", () => {
   const registered = registerStudent(createInitialState(), {
     name: "陈星",
-    email: "chenxing@whu.edu.cn",
+    email: "chenxing-new@whu.edu.cn",
     password: "Passw0rd!",
     major: "软件工程",
     githubUrl: "https://github.com/chenxing"
   });
 
   assert.equal(registered.user.role, "student");
-  assert.equal(registered.user.email, "chenxing@whu.edu.cn");
+  assert.equal(registered.user.email, "chenxing-new@whu.edu.cn");
 
   const session = login(registered.state, {
-    email: "chenxing@whu.edu.cn",
+    email: "chenxing-new@whu.edu.cn",
     password: "Passw0rd!"
   });
 
   assert.equal(session.user.name, "陈星");
   assert.match(session.token, /^session_/);
+});
+
+test("initial demo state looks like an active campus MVP", () => {
+  const state = createInitialState();
+
+  assert.ok(state.users.length >= 12);
+  assert.ok(state.competitions.length >= 5);
+  assert.ok(state.researchProjects.length >= 4);
+  assert.ok(state.teamRecruits.length >= 10);
+  assert.ok(state.applications.length >= 6);
+  assert.ok(state.usageEvents.length >= 15);
 });
 
 test("user can choose a permission role without identity verification", () => {
@@ -125,10 +137,8 @@ test("admin can inspect users and delete database records", () => {
   });
 
   const users = listRegisteredUsers(uploaded.state, admin.user.id);
-  assert.deepEqual(
-    users.map((user) => user.role),
-    ["admin", "student"]
-  );
+  assert.ok(users.some((user) => user.id === admin.user.id && user.role === "admin"));
+  assert.ok(users.some((user) => user.id === student.user.id && user.role === "student"));
 
   const snapshot = getDatabaseSnapshot(uploaded.state, admin.user.id);
   assert.equal(snapshot.tables.certificateRecords.length, 1);
@@ -170,7 +180,7 @@ test("admin database view is readable and supports deleting competitions and res
   });
   assert.equal(
     getDatabaseSnapshot(withoutCompetition.state, admin.user.id).tables.competitions.length,
-    1
+    admin.state.competitions.length - 1
   );
 
   const withoutResearch = deleteDatabaseRecord(withoutCompetition.state, admin.user.id, {
@@ -179,7 +189,7 @@ test("admin database view is readable and supports deleting competitions and res
   });
   assert.equal(
     getDatabaseSnapshot(withoutResearch.state, admin.user.id).tables.researchProjects.length,
-    0
+    withoutCompetition.state.researchProjects.length - 1
   );
 });
 
@@ -205,14 +215,17 @@ test("admin usage records explain actions, users, and targets in readable langua
 
   const view = getAdminDatabaseView(used.state, admin.user.id);
   const usageTable = view.tables.find((table) => table.name === "usageEvents");
+  const usageRecord = usageTable.records.find((record) =>
+    record.fields.some((field) => field.value === "使用同学 · 学生")
+  );
 
-  assert.equal(usageTable.records[0].title, "浏览机会");
-  assert.equal(usageTable.records[0].summary, "中国大学生服务外包创新创业大赛");
-  assert.deepEqual(usageTable.records[0].fields[0], {
+  assert.equal(usageRecord.title, "浏览机会");
+  assert.equal(usageRecord.summary, "中国大学生服务外包创新创业大赛");
+  assert.deepEqual(usageRecord.fields[0], {
     label: "用户",
     value: "使用同学 · 学生"
   });
-  assert.deepEqual(usageTable.records[0].fields[1], {
+  assert.deepEqual(usageRecord.fields[1], {
     label: "目标",
     value: "中国大学生服务外包创新创业大赛"
   });
@@ -256,7 +269,8 @@ test("admin can add competitions and research projects for the opportunity hall"
 });
 
 test("admin can block and delete registered users", () => {
-  const admin = registerUser(createInitialState(), {
+  const initial = createInitialState();
+  const admin = registerUser(initial, {
     role: "admin",
     name: "管理员",
     email: "admin-users@whu.edu.cn",
@@ -285,7 +299,7 @@ test("admin can block and delete registered users", () => {
 
   const deleted = deleteUser(blocked.state, admin.user.id, student.user.id);
   assert.ok(!listRegisteredUsers(deleted.state, admin.user.id).some((user) => user.id === student.user.id));
-  assert.equal(getDatabaseSnapshot(deleted.state, admin.user.id).tables.students.length, 0);
+  assert.equal(getDatabaseSnapshot(deleted.state, admin.user.id).tables.students.length, initial.students.length);
 });
 
 test("mentor can add and delete their own research projects", () => {
@@ -444,11 +458,11 @@ test("student can end, resume, and delete their own team recruit", () => {
 
   const stopped = stopTeamRecruit(created.state, student.user.id, created.recruit.id);
   assert.equal(listTeamRecruitsForStudent(stopped.state, student.user.id)[0].status, "已结束");
-  assert.equal(getCompetitionDetail(stopped.state, "competition_1").teamRecruits.length, 0);
+  assert.ok(!getCompetitionDetail(stopped.state, "competition_1").teamRecruits.some((recruit) => recruit.id === created.recruit.id));
 
   const resumed = resumeTeamRecruit(stopped.state, student.user.id, created.recruit.id);
   assert.equal(listTeamRecruitsForStudent(resumed.state, student.user.id)[0].status, "招募中");
-  assert.equal(getCompetitionDetail(resumed.state, "competition_1").teamRecruits.length, 1);
+  assert.ok(getCompetitionDetail(resumed.state, "competition_1").teamRecruits.some((recruit) => recruit.id === created.recruit.id));
 
   const deleted = deleteTeamRecruit(resumed.state, student.user.id, created.recruit.id);
   assert.equal(listTeamRecruitsForStudent(deleted.state, student.user.id).length, 0);
@@ -509,13 +523,11 @@ test("student can browse opportunities across competitions and research projects
   const state = createInitialState();
 
   const allOpportunities = listOpportunities(state);
-  assert.deepEqual(
-    allOpportunities.map((opportunity) => opportunity.type).sort(),
-    ["competition", "competition", "research"]
-  );
+  assert.ok(allOpportunities.filter((opportunity) => opportunity.type === "competition").length >= 2);
+  assert.ok(allOpportunities.filter((opportunity) => opportunity.type === "research").length >= 1);
 
   const researchOnly = listOpportunities(state, { type: "research" });
-  assert.equal(researchOnly.length, 1);
+  assert.ok(researchOnly.length >= 1);
   assert.equal(researchOnly[0].title, "面向校园服务的智能问答系统");
 });
 
@@ -540,8 +552,35 @@ test("student can publish a team recruit for an existing competition", () => {
   assert.equal(created.recruit.title, "寻找前端和答辩同学");
 
   const detail = getCompetitionDetail(created.state, "competition_1");
-  assert.equal(detail.teamRecruits.length, 1);
-  assert.equal(detail.teamRecruits[0].publisherName, "李队长");
+  assert.ok(detail.teamRecruits.some((candidate) => candidate.id === created.recruit.id));
+  assert.equal(
+    detail.teamRecruits.find((candidate) => candidate.id === created.recruit.id).publisherName,
+    "李队长"
+  );
+});
+
+test("student can publish a team recruit for an open research project", () => {
+  const registered = registerStudent(createInitialState(), {
+    name: "科研组队同学",
+    email: "research-recruit@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程",
+    githubUrl: ""
+  });
+
+  const created = createTeamRecruit(registered.state, {
+    targetType: "research",
+    targetId: "research_1",
+    studentUserId: registered.user.id,
+    title: "寻找 RAG 评测搭子",
+    skills: ["RAG", "评测"],
+    contact: "QQ 654321"
+  });
+
+  const detail = getResearchDetail(created.state, "research_1");
+  assert.ok(detail.teamRecruits.some((recruit) => recruit.id === created.recruit.id));
+  assert.equal(created.recruit.targetType, "research");
+  assert.equal(created.recruit.opportunityTitle, detail.title);
 });
 
 test("legacy team recruit statuses are presented with the current wording", () => {
@@ -558,14 +597,15 @@ test("legacy team recruit statuses are presented with the current wording", () =
     skills: ["测试"],
     contact: "QQ 456456456"
   });
-  created.state.teamRecruits[0].status = "有效";
+  const createdRecruit = created.state.teamRecruits.find((recruit) => recruit.id === created.recruit.id);
+  createdRecruit.status = "有效";
 
   assert.equal(listTeamRecruitsForStudent(created.state, student.user.id)[0].status, "招募中");
-  assert.equal(getCompetitionDetail(created.state, "competition_1").teamRecruits.length, 1);
+  assert.ok(getCompetitionDetail(created.state, "competition_1").teamRecruits.some((recruit) => recruit.id === created.recruit.id));
 
-  created.state.teamRecruits[0].status = "不招了";
+  createdRecruit.status = "不招了";
   assert.equal(listTeamRecruitsForStudent(created.state, student.user.id)[0].status, "已结束");
-  assert.equal(getCompetitionDetail(created.state, "competition_1").teamRecruits.length, 0);
+  assert.ok(!getCompetitionDetail(created.state, "competition_1").teamRecruits.some((recruit) => recruit.id === created.recruit.id));
 });
 
 test("student can apply to an open research project and mentor can review it", () => {

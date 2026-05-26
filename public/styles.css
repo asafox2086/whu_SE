@@ -133,6 +133,31 @@ h3 {
   grid-column: 1;
 }
 
+.layout.is-detail-page {
+  align-items: start;
+}
+
+.student-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.student-action-grid .action-panel {
+  grid-column: auto;
+}
+
+.detail-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+
+.detail-action-grid form {
+  align-content: start;
+}
+
 .section-head,
 .button-row,
 .item-card footer,
@@ -618,6 +643,11 @@ dd {
   }
 
   .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .student-action-grid,
+  .detail-action-grid {
     grid-template-columns: 1fr;
   }
 
