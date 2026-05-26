@@ -45,12 +45,17 @@ let selectedOpportunityId = "";
 let selectedOpportunityDetailType = "";
 let selectedOpportunityPage = 1;
 const opportunityPageSize = 6;
+const listPageSize = 5;
+let listPages = {};
 let serverStorageAvailable = false;
 let pendingStateSave = Promise.resolve();
 
 const selectors = {
   userBadge: document.querySelector("[data-user-badge]"),
   logoutButton: document.querySelector("[data-logout]"),
+  appContent: document.querySelector("[data-app-content]"),
+  authPanel: document.querySelector("[data-auth-panel]"),
+  appPanels: document.querySelectorAll("[data-app-panel]"),
   authForm: document.querySelector("[data-auth-form]"),
   authMessage: document.querySelector("[data-auth-message]"),
   rolePanels: document.querySelectorAll("[data-role-panel]"),
@@ -60,20 +65,29 @@ const selectors = {
   detailPanel: document.querySelector("[data-detail-panel]"),
   recruitForm: document.querySelector("[data-recruit-form]"),
   studentRecruits: document.querySelector("[data-student-recruits]"),
+  studentRecruitsPagination: document.querySelector("[data-student-recruits-pagination]"),
   researchApplyForm: document.querySelector("[data-research-apply-form]"),
   studentApplications: document.querySelector("[data-student-applications]"),
+  studentApplicationsPagination: document.querySelector("[data-student-applications-pagination]"),
   certificateForm: document.querySelector("[data-certificate-form]"),
   certificateList: document.querySelector("[data-certificate-list]"),
+  certificateListPagination: document.querySelector("[data-certificate-list-pagination]"),
   certificateCollection: document.querySelector("[data-certificate-collection]"),
+  certificateCollectionPagination: document.querySelector("[data-certificate-collection-pagination]"),
   adminUsers: document.querySelector("[data-admin-users]"),
+  adminUsersPagination: document.querySelector("[data-admin-users-pagination]"),
   adminDatabase: document.querySelector("[data-admin-database]"),
+  adminDatabasePagination: document.querySelector("[data-admin-database-pagination]"),
   adminCompetitionForm: document.querySelector("[data-admin-competition-form]"),
   adminResearchForm: document.querySelector("[data-admin-research-form]"),
   mentorResearchForm: document.querySelector("[data-mentor-research-form]"),
   mentorProjects: document.querySelector("[data-mentor-projects]"),
+  mentorProjectsPagination: document.querySelector("[data-mentor-projects-pagination]"),
   mentorApplications: document.querySelector("[data-mentor-applications]"),
+  mentorApplicationsPagination: document.querySelector("[data-mentor-applications-pagination]"),
   feedbackForm: document.querySelector("[data-feedback-form]"),
   feedbackList: document.querySelector("[data-feedback-list]"),
+  feedbackListPagination: document.querySelector("[data-feedback-list-pagination]"),
   toast: document.querySelector("[data-toast]")
 };
 
@@ -82,6 +96,7 @@ selectors.logoutButton.addEventListener("click", handleLogout);
 selectors.opportunityFilters.addEventListener("click", handleOpportunityFilter);
 selectors.opportunityList.addEventListener("click", handleOpportunityClick);
 selectors.opportunityPagination.addEventListener("click", handleOpportunityPageClick);
+selectors.appContent.addEventListener("click", handleListPageClick);
 selectors.recruitForm.addEventListener("submit", handleRecruitSubmit);
 selectors.detailPanel.addEventListener("click", handleRecruitManagementClick);
 selectors.studentRecruits.addEventListener("click", handleRecruitManagementClick);
@@ -162,6 +177,17 @@ function handleOpportunityPageClick(event) {
   renderOpportunities();
 }
 
+function handleListPageClick(event) {
+  const button = event.target.closest("button[data-list-page-key][data-list-page]");
+  if (!button) {
+    return;
+  }
+
+  listPages[button.dataset.listPageKey] = Number(button.dataset.listPage);
+  trackUsage("paginate_list", button.dataset.listPageKey);
+  render();
+}
+
 function handleOpportunityClick(event) {
   const button = event.target.closest("button[data-opportunity-id]");
   if (!button) {
@@ -188,6 +214,8 @@ function handleRecruitSubmit(event) {
       contact: form.get("contact")
     });
     state = created.state;
+    resetListPage("studentRecruits");
+    resetListPage(`competitionRecruits:${created.recruit.competitionId}`);
     trackUsage("publish_team_recruit", created.recruit.id);
     saveState();
     event.currentTarget.reset();
@@ -212,11 +240,13 @@ function handleRecruitManagementClick(event) {
     if (action === "stop") {
       const updated = stopTeamRecruit(state, session.user.id, recruitId);
       state = updated.state;
+      resetListPage(`competitionRecruits:${updated.recruit.competitionId}`);
       trackUsage("stop_team_recruit", recruitId);
       showToast("招募已结束");
     } else if (action === "resume") {
       const updated = resumeTeamRecruit(state, session.user.id, recruitId);
       state = updated.state;
+      resetListPage(`competitionRecruits:${updated.recruit.competitionId}`);
       trackUsage("resume_team_recruit", recruitId);
       showToast("招募已重新开启");
     } else if (action === "delete") {
@@ -226,6 +256,8 @@ function handleRecruitManagementClick(event) {
       }
       const updated = deleteTeamRecruit(state, session.user.id, recruitId);
       state = updated.state;
+      resetListPage("studentRecruits");
+      resetListPage(`competitionRecruits:${button.dataset.competitionId}`);
       trackUsage("delete_team_recruit", recruitId);
       showToast("招募已删除");
     }
@@ -251,6 +283,8 @@ function handleResearchApplySubmit(event) {
       statement: form.get("statement")
     });
     state = applied.state;
+    resetListPage("studentApplications");
+    resetListPage("mentorApplications");
     trackUsage("apply_research", applied.application.id);
     saveState();
     event.currentTarget.reset();
@@ -271,6 +305,8 @@ function handleStudentApplicationsClick(event) {
     requireSession();
     const deleted = deleteResearchApplication(state, session.user.id, button.dataset.deleteApplicationId);
     state = deleted.state;
+    resetListPage("studentApplications");
+    resetListPage("mentorApplications");
     trackUsage("delete_research_application", button.dataset.deleteApplicationId);
     saveState();
     showToast("申请已删除");
@@ -299,6 +335,9 @@ async function handleCertificateSubmit(event) {
       fileDataUrl
     });
     state = uploaded.state;
+    resetListPage("certificateList");
+    resetListPage("certificateCollection");
+    resetListPage(`certificateCollection:${uploaded.certificateRecord.competitionId}`);
     trackUsage("upload_certificate_record", uploaded.certificateRecord.id);
     saveState();
     formElement.reset();
@@ -319,6 +358,8 @@ function handleCertificateListClick(event) {
     requireSession();
     const deleted = deleteCertificateRecord(state, session.user.id, button.dataset.deleteCertificateId);
     state = deleted.state;
+    resetListPage("certificateList");
+    resetListPage("certificateCollection");
     trackUsage("delete_certificate_record", button.dataset.deleteCertificateId);
     saveState();
     showToast("证书记录已删除");
@@ -386,6 +427,8 @@ function handleAdminDatabaseClick(event) {
       id: button.dataset.deleteId
     });
     state = deleted.state;
+    resetListPage("adminDatabase");
+    resetListPage(`adminDatabase:${button.dataset.deleteTable}`);
     trackUsage("delete_database_record", `${button.dataset.deleteTable}:${button.dataset.deleteId}`);
     saveState();
     showToast("记录已删除");
@@ -409,16 +452,19 @@ function handleAdminUsersClick(event) {
     if (action === "block") {
       const updated = blockUser(state, session.user.id, userId);
       state = updated.state;
+      resetListPage("adminUsers");
       trackUsage("block_user", userId);
       showToast("用户已封禁");
     } else if (action === "unblock") {
       const updated = unblockUser(state, session.user.id, userId);
       state = updated.state;
+      resetListPage("adminUsers");
       trackUsage("unblock_user", userId);
       showToast("用户已解除封禁");
     } else if (action === "delete") {
       const updated = deleteUser(state, session.user.id, userId);
       state = updated.state;
+      resetListPage("adminUsers");
       trackUsage("delete_user", userId);
       showToast("用户已删除");
     }
@@ -445,6 +491,7 @@ function handleAdminCompetitionSubmit(event) {
       description: form.get("description")
     });
     state = created.state;
+    resetListPage("adminDatabase");
     trackUsage("create_competition", created.competition.id);
     saveState();
     event.currentTarget.reset();
@@ -470,6 +517,8 @@ function handleAdminResearchSubmit(event) {
       status: form.get("status")
     });
     state = created.state;
+    resetListPage("adminDatabase");
+    resetListPage("mentorProjects");
     trackUsage("create_research_project", created.researchProject.id);
     saveState();
     event.currentTarget.reset();
@@ -495,6 +544,7 @@ function handleMentorResearchSubmit(event) {
       status: form.get("status")
     });
     state = created.state;
+    resetListPage("mentorProjects");
     trackUsage("create_research_project", created.researchProject.id);
     saveState();
     event.currentTarget.reset();
@@ -515,6 +565,8 @@ function handleMentorProjectsClick(event) {
     requireSession();
     const deleted = deleteResearchProject(state, session.user.id, button.dataset.deleteResearchId);
     state = deleted.state;
+    resetListPage("mentorProjects");
+    resetListPage("adminDatabase");
     trackUsage("delete_research_project", button.dataset.deleteResearchId);
     saveState();
     showToast("科研项目已删除");
@@ -542,6 +594,8 @@ function handleMentorApplicationReviewSubmit(event) {
       feedback: form.get("feedback")
     });
     state = reviewed.state;
+    resetListPage("mentorApplications");
+    resetListPage("studentApplications");
     trackUsage("review_research_application", reviewed.application.id);
     saveState();
     showToast(reviewed.application.status === "已通过" ? "申请已通过" : "申请已标记未通过");
@@ -564,6 +618,7 @@ function handleFeedbackSubmit(event) {
       rating: form.get("rating")
     });
     state = submitted.state;
+    resetListPage("feedbackList");
     trackUsage("submit_feedback", submitted.feedback.id);
     saveState();
     event.currentTarget.reset();
@@ -578,6 +633,7 @@ function render() {
   renderAuth();
   renderOpportunities();
   renderForms();
+  renderSelectedOpportunityDetail();
   renderStudentRecruits();
   renderStudentApplications();
   renderCertificates();
@@ -588,13 +644,23 @@ function render() {
   renderFeedback();
 }
 
+function renderSelectedOpportunityDetail() {
+  if (selectedOpportunityId && selectedOpportunityDetailType) {
+    renderOpportunityDetail(selectedOpportunityDetailType, selectedOpportunityId);
+  }
+}
+
 function renderAuth() {
   selectors.userBadge.textContent = session
     ? `${session.user.name} · ${roleLabel(session.user.role)}`
     : "未登录";
+  selectors.userBadge.hidden = !session;
   selectors.logoutButton.hidden = !session;
-  selectors.rolePanels.forEach((panel) => {
-    panel.hidden = !session || panel.dataset.rolePanel !== session.user.role;
+  selectors.authPanel.hidden = Boolean(session);
+  selectors.appContent.classList.toggle("is-auth-screen", !session);
+  selectors.appPanels.forEach((panel) => {
+    const role = panel.dataset.rolePanel;
+    panel.hidden = !session || Boolean(role && role !== session.user.role);
   });
   showInlineMessage(selectors.authMessage, null);
 }
@@ -665,6 +731,49 @@ function renderOpportunityPagination(totalPages) {
   `;
 }
 
+function paginateItems(items, key, pageSize = listPageSize) {
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(Math.max(Number(listPages[key] ?? 1), 1), totalPages);
+  const start = (currentPage - 1) * pageSize;
+  listPages[key] = currentPage;
+  return {
+    items: items.slice(start, start + pageSize),
+    totalPages,
+    currentPage
+  };
+}
+
+function renderPagination(key, totalPages, label) {
+  if (totalPages <= 1) {
+    return "";
+  }
+
+  const currentPage = listPages[key] ?? 1;
+  const pageButtons = Array.from({ length: totalPages }, (_, index) => {
+    const page = index + 1;
+    const isActive = page === currentPage;
+    return `
+      <button
+        class="${isActive ? "is-active" : "secondary"}"
+        data-list-page-key="${escapeHtml(key)}"
+        data-list-page="${page}"
+        ${isActive ? `aria-current="page"` : ""}
+      >${page}</button>
+    `;
+  }).join("");
+
+  return `
+    <button class="secondary" data-list-page-key="${escapeHtml(key)}" data-list-page="${Math.max(1, currentPage - 1)}" ${currentPage === 1 ? "disabled" : ""}>上一页</button>
+    <div class="page-numbers">${pageButtons}</div>
+    <button class="secondary" data-list-page-key="${escapeHtml(key)}" data-list-page="${Math.min(totalPages, currentPage + 1)}" ${currentPage === totalPages ? "disabled" : ""}>下一页</button>
+    <small>${escapeHtml(label)} 第 ${currentPage} / ${totalPages} 页</small>
+  `;
+}
+
+function resetListPage(key) {
+  listPages[key] = 1;
+}
+
 function renderOpportunityDetail(type, id) {
   selectedOpportunityId = id;
   selectedOpportunityDetailType = type;
@@ -673,6 +782,7 @@ function renderOpportunityDetail(type, id) {
 
   if (type === "competition") {
     const detail = getCompetitionDetail(state, id);
+    const recruitsPage = paginateItems(detail.teamRecruits, `competitionRecruits:${id}`);
     selectors.detailPanel.innerHTML = `
       <span class="eyebrow">竞赛详情</span>
       <h2>${escapeHtml(detail.title)}</h2>
@@ -683,7 +793,8 @@ function renderOpportunityDetail(type, id) {
         <div><dt>交流群</dt><dd>${escapeHtml(detail.qqGroup)}</dd></div>
       </dl>
       <h3>组队招募</h3>
-      ${renderRecruitList(detail.teamRecruits)}
+      ${renderRecruitList(recruitsPage.items)}
+      <nav class="pagination compact-pagination">${renderPagination(`competitionRecruits:${id}`, recruitsPage.totalPages, `${detail.title}组队招募`)}</nav>
     `;
     selectors.recruitForm.elements.competitionId.value = id;
     return;
@@ -768,25 +879,30 @@ function renderForms() {
 function renderStudentRecruits() {
   if (!session || session.user.role !== "student") {
     selectors.studentRecruits.innerHTML = `<p class="empty">登录后显示你发布的组队招募。</p>`;
+    selectors.studentRecruitsPagination.innerHTML = "";
     return;
   }
 
   const recruits = listTeamRecruitsForStudent(state, session.user.id);
+  const page = paginateItems(recruits, "studentRecruits");
   selectors.studentRecruits.innerHTML = recruits.length === 0
     ? `<p class="empty">还没有发布组队招募。</p>`
-    : renderRecruitList(recruits);
+    : renderRecruitList(page.items);
+  selectors.studentRecruitsPagination.innerHTML = renderPagination("studentRecruits", page.totalPages, "我的招募");
 }
 
 function renderStudentApplications() {
   if (!session || session.user.role !== "student") {
     selectors.studentApplications.innerHTML = `<p class="empty">登录后显示你的科研申请结果。</p>`;
+    selectors.studentApplicationsPagination.innerHTML = "";
     return;
   }
 
   const applications = listResearchApplicationsForStudent(state, session.user.id);
+  const page = paginateItems(applications, "studentApplications");
   selectors.studentApplications.innerHTML = applications.length === 0
     ? `<p class="empty">还没有科研申请记录。</p>`
-    : applications
+    : page.items
         .map(
           (application) => `
             <section class="mini-card">
@@ -810,18 +926,21 @@ function renderStudentApplications() {
           `
         )
         .join("");
+  selectors.studentApplicationsPagination.innerHTML = renderPagination("studentApplications", page.totalPages, "我的申请");
 }
 
 function renderCertificates() {
   if (!session || session.user.role !== "student") {
     selectors.certificateList.innerHTML = `<p class="empty">登录后显示个人证书记录。</p>`;
+    selectors.certificateListPagination.innerHTML = "";
     return;
   }
 
   const records = listCertificateRecords(state, session.user.id);
+  const page = paginateItems(records, "certificateList");
   selectors.certificateList.innerHTML = records.length === 0
     ? `<p class="empty">还没有证书记录。</p>`
-    : records
+    : page.items
         .map(
           (record) => `
             <section class="mini-card">
@@ -838,21 +957,26 @@ function renderCertificates() {
           `
         )
         .join("");
+  selectors.certificateListPagination.innerHTML = renderPagination("certificateList", page.totalPages, "个人证书");
 }
 
 function renderCertificateCollection() {
   if (!session || session.user.role !== "certificate_collector") {
     selectors.certificateCollection.innerHTML = `<p class="empty">切换为证书收集者后显示汇总。</p>`;
+    selectors.certificateCollectionPagination.innerHTML = "";
     return;
   }
 
   const groups = listCertificateCollectionByCompetition(state, session.user.id);
+  const page = paginateItems(groups, "certificateCollection");
   selectors.certificateCollection.innerHTML = groups.length === 0
     ? `<p class="empty">还没有证书记录。</p>`
-    : groups
+    : page.items
         .map(
-          (group) => `
-            <details class="collection-group">
+          (group) => {
+            const recordsPage = paginateItems(group.records, `certificateCollection:${group.competitionId}`);
+            return `
+            <details class="collection-group" open>
               <summary>
                 <span>${escapeHtml(group.competitionTitle)}</span>
                 <small>${group.records.length} 份证书</small>
@@ -861,7 +985,7 @@ function renderCertificateCollection() {
                 <button data-export-competition-id="${escapeHtml(group.competitionId)}">导出合集</button>
               </div>
               <div class="stack">
-                ${group.records
+                ${recordsPage.items
                   .map(
                     (record) => `
                       <section class="mini-card">
@@ -879,22 +1003,28 @@ function renderCertificateCollection() {
                   )
                   .join("")}
               </div>
+              <nav class="pagination compact-pagination">${renderPagination(`certificateCollection:${group.competitionId}`, recordsPage.totalPages, `${group.competitionTitle}证书`)}</nav>
             </details>
-          `
+          `;
+          }
         )
         .join("");
+  selectors.certificateCollectionPagination.innerHTML = renderPagination("certificateCollection", page.totalPages, "证书汇总");
 }
 
 function renderAdmin() {
   if (!session || session.user.role !== "admin") {
     selectors.adminUsers.innerHTML = `<p class="empty">切换为管理员后显示注册用户。</p>`;
+    selectors.adminUsersPagination.innerHTML = "";
     selectors.adminDatabase.innerHTML = "";
+    selectors.adminDatabasePagination.innerHTML = "";
     return;
   }
 
   const users = listRegisteredUsers(state, session.user.id);
+  const usersPage = paginateItems(users, "adminUsers");
   const currentUserId = session.user.id;
-  selectors.adminUsers.innerHTML = users
+  selectors.adminUsers.innerHTML = usersPage.items
     .map(
       (user) => `
         <section class="mini-card">
@@ -917,13 +1047,16 @@ function renderAdmin() {
       `
     )
     .join("");
+  selectors.adminUsersPagination.innerHTML = renderPagination("adminUsers", usersPage.totalPages, "注册用户");
 
   const view = getAdminDatabaseView(state, session.user.id);
-  selectors.adminDatabase.innerHTML = view.tables
+  const tablePage = paginateItems(view.tables, "adminDatabase");
+  selectors.adminDatabase.innerHTML = tablePage.items
     .map((table) => {
+      const recordPage = paginateItems(table.records, `adminDatabase:${table.name}`);
       const rowList = table.records.length === 0
         ? `<p class="empty">空表</p>`
-        : table.records
+        : recordPage.items
             .map(
               (record) => `
                 <section class="db-row">
@@ -954,22 +1087,26 @@ function renderAdmin() {
         <article class="db-card">
           <h3>${escapeHtml(table.label)} <span>${table.records.length}</span></h3>
           ${rowList}
+          <nav class="pagination compact-pagination">${renderPagination(`adminDatabase:${table.name}`, recordPage.totalPages, `${table.label}记录`)}</nav>
         </article>
       `;
     })
     .join("");
+  selectors.adminDatabasePagination.innerHTML = renderPagination("adminDatabase", tablePage.totalPages, "数据库表");
 }
 
 function renderMentorApplications() {
   if (!session || session.user.role !== "mentor") {
     selectors.mentorApplications.innerHTML = `<p class="empty">切换为导师后显示申请队列。</p>`;
+    selectors.mentorApplicationsPagination.innerHTML = "";
     return;
   }
 
   const applications = listResearchApplicationsForMentor(state, session.user.id);
+  const page = paginateItems(applications, "mentorApplications");
   selectors.mentorApplications.innerHTML = applications.length === 0
     ? `<p class="empty">暂无科研项目申请。</p>`
-    : applications
+    : page.items
         .map(
           (application) => `
             <section class="mini-card">
@@ -1001,18 +1138,21 @@ function renderMentorApplications() {
           `
         )
         .join("");
+  selectors.mentorApplicationsPagination.innerHTML = renderPagination("mentorApplications", page.totalPages, "科研申请队列");
 }
 
 function renderMentorProjects() {
   if (!session || session.user.role !== "mentor") {
     selectors.mentorProjects.innerHTML = `<p class="empty">切换为导师后显示你发布的科研项目。</p>`;
+    selectors.mentorProjectsPagination.innerHTML = "";
     return;
   }
 
   const projects = listResearchProjectsForMentor(state, session.user.id);
+  const page = paginateItems(projects, "mentorProjects");
   selectors.mentorProjects.innerHTML = projects.length === 0
     ? `<p class="empty">还没有发布科研项目。</p>`
-    : projects
+    : page.items
         .map(
           (project) => `
             <section class="mini-card project-row">
@@ -1026,13 +1166,15 @@ function renderMentorProjects() {
           `
         )
         .join("");
+  selectors.mentorProjectsPagination.innerHTML = renderPagination("mentorProjects", page.totalPages, "我的科研项目");
 }
 
 function renderFeedback() {
   const entries = listFeedbackEntries(state);
+  const page = paginateItems(entries, "feedbackList");
   selectors.feedbackList.innerHTML = entries.length === 0
     ? `<p class="empty">暂无反馈记录。</p>`
-    : entries
+    : page.items
         .map(
           (entry) => `
             <section class="mini-card">
@@ -1043,6 +1185,9 @@ function renderFeedback() {
           `
         )
         .join("");
+  selectors.feedbackListPagination.innerHTML = session
+    ? renderPagination("feedbackList", page.totalPages, "使用反馈")
+    : "";
 }
 
 function renderCertificatePreview(record) {

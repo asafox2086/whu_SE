@@ -14,12 +14,12 @@
       </div>
       <div class="session-tools">
         <span class="user-badge" data-user-badge>未登录</span>
-        <button class="secondary" data-logout hidden>切换身份</button>
+        <button class="secondary" data-logout hidden>退出登录</button>
       </div>
     </header>
 
-    <main class="layout">
-      <section class="panel auth-panel">
+    <main class="layout" data-app-content>
+      <section class="panel auth-panel" data-auth-panel>
         <h2>用户入口</h2>
         <form data-auth-form>
           <label>
@@ -63,7 +63,7 @@
         </form>
       </section>
 
-      <section class="panel opportunities">
+      <section class="panel opportunities" data-app-panel>
         <div class="section-head">
           <div>
             <p class="eyebrow">机会大厅</p>
@@ -79,13 +79,13 @@
         <nav class="pagination" data-opportunity-pagination aria-label="机会分页"></nav>
       </section>
 
-      <section class="panel detail-panel" data-detail-panel>
+      <section class="panel detail-panel" data-detail-panel data-app-panel>
         <p class="eyebrow">详情</p>
         <h2>选择一个机会</h2>
         <p>查看竞赛招募或科研申请入口。</p>
       </section>
 
-      <section class="panel action-panel" data-role-panel="student">
+      <section class="panel action-panel" data-role-panel="student" data-app-panel>
         <h2>发布组队招募</h2>
         <form data-recruit-form>
           <label>
@@ -108,9 +108,10 @@
         </form>
         <h3>我的招募</h3>
         <div class="stack" data-student-recruits></div>
+        <nav class="pagination compact-pagination" data-student-recruits-pagination aria-label="我的招募分页"></nav>
       </section>
 
-      <section class="panel action-panel" data-role-panel="student">
+      <section class="panel action-panel" data-role-panel="student" data-app-panel>
         <h2>申请科研项目</h2>
         <form data-research-apply-form>
           <label>
@@ -125,9 +126,10 @@
         </form>
         <h3>我的申请结果</h3>
         <div class="stack" data-student-applications></div>
+        <nav class="pagination compact-pagination" data-student-applications-pagination aria-label="我的申请分页"></nav>
       </section>
 
-      <section class="panel certificate-panel" data-role-panel="student">
+      <section class="panel certificate-panel" data-role-panel="student" data-app-panel>
         <p class="eyebrow">证书中心</p>
         <h2>上传与查看证书</h2>
         <form data-certificate-form>
@@ -150,18 +152,21 @@
           <button type="submit">保存记录</button>
         </form>
         <div class="stack" data-certificate-list></div>
+        <nav class="pagination compact-pagination" data-certificate-list-pagination aria-label="个人证书分页"></nav>
       </section>
 
-      <section class="panel certificate-panel" data-role-panel="certificate_collector">
+      <section class="panel certificate-panel" data-role-panel="certificate_collector" data-app-panel>
         <p class="eyebrow">证书中心</p>
         <h2>证书汇总</h2>
         <div class="stack" data-certificate-collection></div>
+        <nav class="pagination compact-pagination" data-certificate-collection-pagination aria-label="证书汇总分页"></nav>
       </section>
 
-      <section class="panel admin-panel" data-role-panel="admin">
+      <section class="panel admin-panel" data-role-panel="admin" data-app-panel>
         <p class="eyebrow">管理员模式</p>
         <h2>注册用户</h2>
         <div class="stack" data-admin-users></div>
+        <nav class="pagination compact-pagination" data-admin-users-pagination aria-label="注册用户分页"></nav>
         <h2>新增机会</h2>
         <div class="admin-editor-grid">
           <form data-admin-competition-form>
@@ -232,9 +237,10 @@
         </div>
         <h2>数据库</h2>
         <div class="database-grid" data-admin-database></div>
+        <nav class="pagination compact-pagination" data-admin-database-pagination aria-label="数据库分页"></nav>
       </section>
 
-      <section class="panel mentor-panel" data-role-panel="mentor">
+      <section class="panel mentor-panel" data-role-panel="mentor" data-app-panel>
         <p class="eyebrow">导师侧演示</p>
         <h2>我的科研项目</h2>
         <form data-mentor-research-form>
@@ -268,11 +274,13 @@
           <button type="submit">发布科研项目</button>
         </form>
         <div class="stack" data-mentor-projects></div>
+        <nav class="pagination compact-pagination" data-mentor-projects-pagination aria-label="导师项目分页"></nav>
         <h2>科研申请队列</h2>
         <div class="stack" data-mentor-applications></div>
+        <nav class="pagination compact-pagination" data-mentor-applications-pagination aria-label="科研申请队列分页"></nav>
       </section>
 
-      <section class="panel mentor-panel">
+      <section class="panel mentor-panel" data-app-panel>
         <p class="eyebrow">MVP 验证</p>
         <h2>使用反馈</h2>
         <form data-feedback-form>
@@ -301,6 +309,7 @@
           <button type="submit">提交反馈</button>
         </form>
         <div class="stack" data-feedback-list></div>
+        <nav class="pagination compact-pagination" data-feedback-list-pagination aria-label="反馈分页"></nav>
       </section>
     </main>
 

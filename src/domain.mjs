@@ -1120,6 +1120,7 @@ function usageActionLabel(action) {
     view_opportunity: "浏览机会",
     filter_opportunities: "筛选机会",
     paginate_opportunities: "切换机会分页",
+    paginate_list: "切换列表分页",
     publish_team_recruit: "发布组队招募",
     stop_team_recruit: "结束组队招募",
     resume_team_recruit: "重新开启组队招募",

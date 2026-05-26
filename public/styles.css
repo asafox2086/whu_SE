@@ -90,6 +90,12 @@ h3 {
   padding: 16px;
 }
 
+.layout.is-auth-screen {
+  min-height: calc(100vh - 98px);
+  grid-template-columns: 1fr;
+  place-items: center;
+}
+
 .panel {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -107,6 +113,11 @@ h3 {
 
 .auth-panel,
 .action-panel {
+  grid-column: 1;
+}
+
+.layout.is-auth-screen .auth-panel {
+  width: min(560px, 100%);
   grid-column: 1;
 }
 
@@ -257,6 +268,14 @@ button:disabled {
   color: #fff;
   background: var(--accent-strong);
   border-color: var(--accent-strong);
+}
+
+.compact-pagination {
+  margin-top: 10px;
+}
+
+.compact-pagination small {
+  color: var(--muted);
 }
 
 .item-card,
