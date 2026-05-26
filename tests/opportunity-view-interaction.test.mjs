@@ -30,6 +30,7 @@ test("opportunity view action navigates to a dedicated detail page", async () =>
   assert.match(styles, /\.detail-hero\s*\{[\s\S]*text-align:\s*center/);
   assert.match(styles, /\.detail-hero h2\s*\{[\s\S]*text-align:\s*center/);
   assert.match(styles, /\.detail-facts\s*\{[\s\S]*text-align:\s*center/);
+  assert.match(styles, /\.meta-grid\.detail-facts\s*\{[\s\S]*margin:\s*0 auto 24px/);
   assert.match(styles, /\.meta-grid\.detail-facts div\s*\{[\s\S]*border-left:\s*0/);
   assert.match(styles, /\.research-detail-grid\s*\{[\s\S]*grid-template-columns/);
   assert.match(styles, /\.item-card:focus-within/);

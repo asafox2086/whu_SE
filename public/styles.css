@@ -175,7 +175,7 @@ h3 {
   line-height: 1.7;
 }
 
-.detail-facts {
+.meta-grid.detail-facts {
   max-width: 980px;
   margin: 0 auto 24px;
   border: 1px solid var(--line);
@@ -499,8 +499,35 @@ button:disabled {
 }
 
 .recruit-meta,
-.recruit-contact {
+.recruit-contact,
+.recruit-introduction {
   color: var(--muted);
+}
+
+.recruit-introduction {
+  margin: 0;
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+  line-height: 1.55;
+}
+
+.recruit-owner-tools {
+  display: grid;
+  min-width: min(360px, 100%);
+  gap: 12px;
+}
+
+.recruit-edit-form {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.recruit-edit-form textarea {
+  min-height: 84px;
 }
 
 .recruit-tags {

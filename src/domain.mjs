@@ -455,6 +455,7 @@ export function createTeamRecruit(state, payload) {
 
   const student = findStudentByUserId(next, payload.studentUserId);
   const title = requiredText(payload.title, "招募标题");
+  const introduction = optionalText(payload.introduction, "");
   const contact = requiredText(payload.contact, "联系方式");
   const skills = normalizeTags(payload.skills, "技能标签");
 
@@ -466,6 +467,7 @@ export function createTeamRecruit(state, payload) {
     researchId: target.type === "research" ? target.id : "",
     studentId: student.id,
     title,
+    introduction,
     skills,
     contact,
     publishTime: new Date().toISOString(),
@@ -473,6 +475,29 @@ export function createTeamRecruit(state, payload) {
   };
 
   next.teamRecruits.push(recruit);
+
+  return {
+    state: next,
+    recruit: presentTeamRecruit(next, recruit)
+  };
+}
+
+export function updateTeamRecruit(state, studentUserId, recruitId, payload) {
+  const student = findStudentByUserId(state, studentUserId);
+  const next = cloneState(state);
+  const recruit = next.teamRecruits.find((item) => item.id === recruitId);
+  if (!recruit) {
+    throw new DomainError("组队招募不存在", "TEAM_RECRUIT_NOT_FOUND");
+  }
+  if (recruit.studentId !== student.id) {
+    throw new DomainError("只能修改自己发布的组队招募", "TEAM_RECRUIT_FORBIDDEN");
+  }
+
+  recruit.title = requiredText(payload.title, "招募标题");
+  recruit.introduction = optionalText(payload.introduction, "");
+  recruit.skills = normalizeTags(payload.skills, "技能标签");
+  recruit.contact = requiredText(payload.contact, "联系方式");
+  recruit.updatedAt = new Date().toISOString();
 
   return {
     state: next,
@@ -949,6 +974,7 @@ export function getAdminDatabaseView(state, adminUserId) {
         const presented = presentTeamRecruit(state, recruit);
         return readableRecord(recruit.id, recruit.title, `${presented.status} · ${presented.contact}`, [
           ["目标", `${presented.targetLabel} · ${presented.opportunityTitle}`],
+          ["介绍", presented.introduction],
           ["技能", recruit.skills.join(" / ")],
           ["联系方式", recruit.contact],
           ["状态", presented.status]
@@ -1309,6 +1335,7 @@ function usageActionLabel(action) {
     paginate_opportunities: "切换机会分页",
     paginate_list: "切换列表分页",
     publish_team_recruit: "发布组队招募",
+    update_team_recruit: "更新组队招募",
     stop_team_recruit: "结束组队招募",
     resume_team_recruit: "重新开启组队招募",
     delete_team_recruit: "删除组队招募",
@@ -1482,6 +1509,7 @@ function presentTeamRecruit(state, recruit) {
     targetId,
     competitionId: targetType === "competition" ? targetId : recruit.competitionId,
     researchId: targetType === "research" ? targetId : recruit.researchId,
+    introduction: recruit.introduction ?? "",
     status: normalizeTeamRecruitStatus(recruit.status),
     publisherName: user?.name ?? "未知学生",
     opportunityTitle,

@@ -34,6 +34,7 @@ import {
   stopTeamRecruit,
   submitFeedback,
   unblockUser,
+  updateTeamRecruit,
   uploadCertificateRecord
 } from "./domain.mjs";
 
@@ -113,6 +114,8 @@ selectors.mentorResearchForm.addEventListener("submit", handleMentorResearchSubm
 selectors.mentorProjects.addEventListener("click", handleMentorProjectsClick);
 selectors.mentorApplications.addEventListener("submit", handleMentorApplicationReviewSubmit);
 selectors.detailPanel.addEventListener("submit", handleDetailPanelSubmit);
+selectors.detailPanel.addEventListener("submit", handleTeamRecruitEditSubmit);
+selectors.studentRecruits.addEventListener("submit", handleTeamRecruitEditSubmit);
 window.addEventListener("hashchange", handleRouteChange);
 
 syncRouteFromLocation();
@@ -218,6 +221,7 @@ function submitTeamRecruit(formElement, target) {
       targetId: target.id,
       studentUserId: session.user.id,
       title: form.get("title"),
+      introduction: form.get("introduction"),
       skills: `${form.get("skills")}`.split(/[，,]/),
       contact: form.get("contact")
     });
@@ -235,6 +239,10 @@ function submitTeamRecruit(formElement, target) {
 }
 
 function handleDetailPanelSubmit(event) {
+  if (event.target.closest("form[data-team-recruit-edit-form]")) {
+    return;
+  }
+
   const recruitForm = event.target.closest("form[data-detail-recruit-form]");
   if (recruitForm) {
     event.preventDefault();
@@ -249,6 +257,33 @@ function handleDetailPanelSubmit(event) {
   if (researchApplyForm) {
     event.preventDefault();
     submitResearchApplication(researchApplyForm, researchApplyForm.dataset.researchId);
+  }
+}
+
+function handleTeamRecruitEditSubmit(event) {
+  const editForm = event.target.closest("form[data-team-recruit-edit-form]");
+  if (!editForm) {
+    return;
+  }
+
+  event.preventDefault();
+  try {
+    requireSession();
+    const form = new FormData(editForm);
+    const updated = updateTeamRecruit(state, session.user.id, editForm.dataset.teamRecruitId, {
+      title: form.get("title"),
+      introduction: form.get("introduction"),
+      skills: `${form.get("skills")}`.split(/[，,]/),
+      contact: form.get("contact")
+    });
+    state = updated.state;
+    resetListPage(opportunityRecruitPageKey(updated.recruit.targetType, updated.recruit.targetId));
+    trackUsage("update_team_recruit", updated.recruit.id);
+    saveState();
+    showToast("组队信息已更新");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
   }
 }
 
@@ -953,6 +988,10 @@ function renderDetailStudentActions(type, id) {
           <input name="skills" required placeholder="Vue, Python, PPT">
         </label>
         <label>
+          介绍
+          <textarea name="introduction" placeholder="介绍一下目前的进度吧"></textarea>
+        </label>
+        <label>
           联系方式
           <input name="contact" required placeholder="QQ 123456789">
         </label>
@@ -984,6 +1023,7 @@ function renderRecruitList(recruits) {
               <span class="status-pill ${recruit.status === "招募中" ? "is-open" : "is-closed"}">${escapeHtml(recruit.status)}</span>
               <strong>${escapeHtml(recruit.title)}</strong>
               <span class="recruit-meta">${escapeHtml(recruit.targetLabel ?? "竞赛")} · ${escapeHtml(recruit.opportunityTitle ?? recruit.competitionTitle)} · ${escapeHtml(recruit.publisherName)}</span>
+              ${recruit.introduction ? `<p class="recruit-introduction">${escapeHtml(recruit.introduction)}</p>` : ""}
               <span class="recruit-contact">联系方式：${escapeHtml(recruit.contact)}</span>
               <div class="recruit-tags">
                 ${recruit.skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join("")}
@@ -991,11 +1031,32 @@ function renderRecruitList(recruits) {
             </div>
             ${currentStudentId && recruit.studentId === currentStudentId
               ? `
-                <div class="button-row">
-                  ${recruit.status === "招募中"
-                    ? `<button data-team-recruit-action="stop" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">结束招募</button>`
-                    : `<button data-team-recruit-action="resume" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">继续招募</button>`}
-                  <button class="secondary" data-team-recruit-action="delete" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">删除</button>
+                <div class="recruit-owner-tools">
+                  <div class="button-row">
+                    ${recruit.status === "招募中"
+                      ? `<button data-team-recruit-action="stop" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">结束招募</button>`
+                      : `<button data-team-recruit-action="resume" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">继续招募</button>`}
+                    <button class="secondary" data-team-recruit-action="delete" data-team-recruit-id="${escapeHtml(recruit.id)}" data-target-type="${escapeHtml(targetType)}" data-target-id="${escapeHtml(targetId)}">删除</button>
+                  </div>
+                  <form class="recruit-edit-form" data-team-recruit-edit-form data-team-recruit-id="${escapeHtml(recruit.id)}">
+                    <label>
+                      标题
+                      <input name="title" required value="${escapeHtml(recruit.title)}">
+                    </label>
+                    <label>
+                      技能标签
+                      <input name="skills" required value="${escapeHtml(recruit.skills.join(", "))}">
+                    </label>
+                    <label>
+                      介绍
+                      <textarea name="introduction" placeholder="介绍一下目前的进度吧">${escapeHtml(recruit.introduction)}</textarea>
+                    </label>
+                    <label>
+                      联系方式
+                      <input name="contact" required value="${escapeHtml(recruit.contact)}">
+                    </label>
+                    <button type="submit">保存修改</button>
+                  </form>
                 </div>
               `
               : ""}

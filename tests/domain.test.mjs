@@ -36,6 +36,7 @@ import {
   registerStudent,
   stopTeamRecruit,
   submitFeedback,
+  updateTeamRecruit,
   uploadCertificateRecord
 } from "../src/domain.mjs";
 
@@ -545,18 +546,65 @@ test("student can publish a team recruit for an existing competition", () => {
     competitionId: "competition_1",
     studentUserId: registered.user.id,
     title: "寻找前端和答辩同学",
+    introduction: "原型已经完成，正在补报名材料。",
     skills: ["Vue", "PPT"],
     contact: "QQ 123456789"
   });
 
   assert.equal(created.recruit.status, "招募中");
   assert.equal(created.recruit.title, "寻找前端和答辩同学");
+  assert.equal(created.recruit.introduction, "原型已经完成，正在补报名材料。");
 
   const detail = getCompetitionDetail(created.state, "competition_1");
   assert.ok(detail.teamRecruits.some((candidate) => candidate.id === created.recruit.id));
   assert.equal(
     detail.teamRecruits.find((candidate) => candidate.id === created.recruit.id).publisherName,
     "李队长"
+  );
+});
+
+test("student can update their own team recruit in real time", () => {
+  const owner = registerStudent(createInitialState(), {
+    name: "可编辑队长",
+    email: "editable-recruit@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const outsider = registerStudent(owner.state, {
+    name: "旁观同学",
+    email: "outsider-recruit@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程"
+  });
+  const created = createTeamRecruit(outsider.state, {
+    competitionId: "competition_1",
+    studentUserId: owner.user.id,
+    title: "寻找前端同学",
+    introduction: "已经完成选题。",
+    skills: ["Vue"],
+    contact: "QQ 111111"
+  });
+
+  const updated = updateTeamRecruit(created.state, owner.user.id, created.recruit.id, {
+    title: "寻找前端和测试同学",
+    introduction: "后端接口已联调，正在完善演示。",
+    skills: ["Vue", "Playwright"],
+    contact: "QQ 222222"
+  });
+  const listed = listTeamRecruitsForStudent(updated.state, owner.user.id)[0];
+
+  assert.equal(updated.recruit.title, "寻找前端和测试同学");
+  assert.equal(listed.introduction, "后端接口已联调，正在完善演示。");
+  assert.deepEqual(listed.skills, ["Vue", "Playwright"]);
+  assert.equal(getCompetitionDetail(updated.state, "competition_1").teamRecruits.find((recruit) => recruit.id === created.recruit.id).contact, "QQ 222222");
+  assert.throws(
+    () => updateTeamRecruit(updated.state, outsider.user.id, created.recruit.id, {
+      title: "不能改别人的公告",
+      introduction: "不应该成功",
+      skills: ["测试"],
+      contact: "QQ 333333"
+    }),
+    (error) => error.code === "TEAM_RECRUIT_FORBIDDEN"
   );
 });
 
