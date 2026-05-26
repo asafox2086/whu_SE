@@ -26,7 +26,10 @@ test("all growing lists render through shared pagination controls", async () => 
   assert.match(app, /data-list-page-key/);
   assert.match(app, /paginateItems/);
   assert.match(app, /renderPagination/);
+  assert.match(app, /getCompactPageNumbers/);
+  assert.match(app, /pagination-ellipsis/);
   assert.match(app, /resetListPage/);
+  assert.match(app, /paginateItems\(view\.tables, "adminDatabase", 1\)/);
 
   for (const key of [
     "studentRecruits",

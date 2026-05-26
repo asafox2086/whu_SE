@@ -658,6 +658,7 @@ function renderAuth() {
   selectors.logoutButton.hidden = !session;
   selectors.authPanel.hidden = Boolean(session);
   selectors.appContent.classList.toggle("is-auth-screen", !session);
+  selectors.appContent.classList.toggle("is-logged-in", Boolean(session));
   selectors.appPanels.forEach((panel) => {
     const role = panel.dataset.rolePanel;
     panel.hidden = !session || Boolean(role && role !== session.user.role);
@@ -712,8 +713,10 @@ function renderOpportunityPagination(totalPages) {
     return;
   }
 
-  const pageButtons = Array.from({ length: totalPages }, (_, index) => {
-    const page = index + 1;
+  const pageButtons = getCompactPageNumbers(selectedOpportunityPage, totalPages).map((page) => {
+    if (page === "ellipsis") {
+      return `<span class="pagination-ellipsis" aria-hidden="true">...</span>`;
+    }
     const isActive = page === selectedOpportunityPage;
     return `
       <button
@@ -743,14 +746,36 @@ function paginateItems(items, key, pageSize = listPageSize) {
   };
 }
 
+function getCompactPageNumbers(currentPage, totalPages) {
+  if (totalPages <= 4) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pageSet = new Set([1, 2, 3, totalPages]);
+  if (currentPage > 3 && currentPage < totalPages) {
+    pageSet.add(currentPage);
+  }
+
+  const pages = [...pageSet]
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b);
+
+  return pages.flatMap((page, index) => {
+    const previous = pages[index - 1];
+    return previous && page - previous > 1 ? ["ellipsis", page] : [page];
+  });
+}
+
 function renderPagination(key, totalPages, label) {
   if (totalPages <= 1) {
     return "";
   }
 
   const currentPage = listPages[key] ?? 1;
-  const pageButtons = Array.from({ length: totalPages }, (_, index) => {
-    const page = index + 1;
+  const pageButtons = getCompactPageNumbers(currentPage, totalPages).map((page) => {
+    if (page === "ellipsis") {
+      return `<span class="pagination-ellipsis" aria-hidden="true">...</span>`;
+    }
     const isActive = page === currentPage;
     return `
       <button
@@ -1050,7 +1075,7 @@ function renderAdmin() {
   selectors.adminUsersPagination.innerHTML = renderPagination("adminUsers", usersPage.totalPages, "注册用户");
 
   const view = getAdminDatabaseView(state, session.user.id);
-  const tablePage = paginateItems(view.tables, "adminDatabase");
+  const tablePage = paginateItems(view.tables, "adminDatabase", 1);
   selectors.adminDatabase.innerHTML = tablePage.items
     .map((table) => {
       const recordPage = paginateItems(table.records, `adminDatabase:${table.name}`);

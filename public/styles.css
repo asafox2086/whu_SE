@@ -125,6 +125,14 @@ h3 {
   grid-column: 2;
 }
 
+.layout.is-logged-in {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layout.is-logged-in [data-app-panel] {
+  grid-column: 1;
+}
+
 .section-head,
 .button-row,
 .item-card footer,
@@ -257,6 +265,12 @@ button:disabled {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.pagination-ellipsis {
+  min-width: 24px;
+  color: var(--muted);
+  text-align: center;
 }
 
 .pagination button {

@@ -14,6 +14,8 @@ test("opportunity hall renders paginated cards with numbered page controls", asy
   assert.match(app, /handleOpportunityPageClick/);
   assert.match(app, /data-opportunity-page/);
   assert.match(app, /aria-current="page"/);
+  assert.match(app, /getCompactPageNumbers\(selectedOpportunityPage, totalPages\)/);
+  assert.match(app, /pagination-ellipsis/);
   assert.match(app, /\.slice\(/);
   assert.match(app, /Math\.ceil/);
   assert.match(app, /selectedOpportunityPage = 1/);

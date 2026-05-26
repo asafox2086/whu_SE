@@ -18,7 +18,7 @@
       </div>
     </header>
 
-    <main class="layout" data-app-content>
+    <main class="layout is-auth-screen" data-app-content>
       <section class="panel auth-panel" data-auth-panel>
         <h2>用户入口</h2>
         <form data-auth-form>
@@ -63,7 +63,7 @@
         </form>
       </section>
 
-      <section class="panel opportunities" data-app-panel>
+      <section class="panel opportunities" data-app-panel hidden>
         <div class="section-head">
           <div>
             <p class="eyebrow">机会大厅</p>
@@ -79,13 +79,13 @@
         <nav class="pagination" data-opportunity-pagination aria-label="机会分页"></nav>
       </section>
 
-      <section class="panel detail-panel" data-detail-panel data-app-panel>
+      <section class="panel detail-panel" data-detail-panel data-app-panel hidden>
         <p class="eyebrow">详情</p>
         <h2>选择一个机会</h2>
         <p>查看竞赛招募或科研申请入口。</p>
       </section>
 
-      <section class="panel action-panel" data-role-panel="student" data-app-panel>
+      <section class="panel action-panel" data-role-panel="student" data-app-panel hidden>
         <h2>发布组队招募</h2>
         <form data-recruit-form>
           <label>
@@ -111,7 +111,7 @@
         <nav class="pagination compact-pagination" data-student-recruits-pagination aria-label="我的招募分页"></nav>
       </section>
 
-      <section class="panel action-panel" data-role-panel="student" data-app-panel>
+      <section class="panel action-panel" data-role-panel="student" data-app-panel hidden>
         <h2>申请科研项目</h2>
         <form data-research-apply-form>
           <label>
@@ -129,7 +129,7 @@
         <nav class="pagination compact-pagination" data-student-applications-pagination aria-label="我的申请分页"></nav>
       </section>
 
-      <section class="panel certificate-panel" data-role-panel="student" data-app-panel>
+      <section class="panel certificate-panel" data-role-panel="student" data-app-panel hidden>
         <p class="eyebrow">证书中心</p>
         <h2>上传与查看证书</h2>
         <form data-certificate-form>
@@ -155,14 +155,14 @@
         <nav class="pagination compact-pagination" data-certificate-list-pagination aria-label="个人证书分页"></nav>
       </section>
 
-      <section class="panel certificate-panel" data-role-panel="certificate_collector" data-app-panel>
+      <section class="panel certificate-panel" data-role-panel="certificate_collector" data-app-panel hidden>
         <p class="eyebrow">证书中心</p>
         <h2>证书汇总</h2>
         <div class="stack" data-certificate-collection></div>
         <nav class="pagination compact-pagination" data-certificate-collection-pagination aria-label="证书汇总分页"></nav>
       </section>
 
-      <section class="panel admin-panel" data-role-panel="admin" data-app-panel>
+      <section class="panel admin-panel" data-role-panel="admin" data-app-panel hidden>
         <p class="eyebrow">管理员模式</p>
         <h2>注册用户</h2>
         <div class="stack" data-admin-users></div>
@@ -240,7 +240,7 @@
         <nav class="pagination compact-pagination" data-admin-database-pagination aria-label="数据库分页"></nav>
       </section>
 
-      <section class="panel mentor-panel" data-role-panel="mentor" data-app-panel>
+      <section class="panel mentor-panel" data-role-panel="mentor" data-app-panel hidden>
         <p class="eyebrow">导师侧演示</p>
         <h2>我的科研项目</h2>
         <form data-mentor-research-form>
@@ -280,7 +280,7 @@
         <nav class="pagination compact-pagination" data-mentor-applications-pagination aria-label="科研申请队列分页"></nav>
       </section>
 
-      <section class="panel mentor-panel" data-app-panel>
+      <section class="panel mentor-panel" data-app-panel hidden>
         <p class="eyebrow">MVP 验证</p>
         <h2>使用反馈</h2>
         <form data-feedback-form>
