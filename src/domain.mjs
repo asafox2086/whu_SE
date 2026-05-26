@@ -67,10 +67,14 @@ export function createInitialState() {
 export function mergeDemoSeedState(state = {}) {
   const demo = demoData();
   const normalized = normalizeStateCollections(state);
-  if (Number(normalized.demoSeedVersion ?? 0) >= demo.demoSeedVersion) {
-    return normalized;
+  const applicationOnlyResearch = {
+    ...normalized,
+    teamRecruits: normalized.teamRecruits.filter((recruit) => teamRecruitTargetType(recruit) !== "research")
+  };
+  if (Number(applicationOnlyResearch.demoSeedVersion ?? 0) >= demo.demoSeedVersion) {
+    return applicationOnlyResearch;
   }
-  return mergeDemoData(normalized, demo);
+  return mergeDemoData(applicationOnlyResearch, demo);
 }
 
 function withDemoData(baseState) {
@@ -80,7 +84,7 @@ function withDemoData(baseState) {
 function demoData() {
   const demoPasswordHash = hashPassword("Passw0rd!");
   return {
-    demoSeedVersion: 2,
+    demoSeedVersion: 3,
     users: [
       { id: "user_mentor_1", name: "周老师", email: "zhoumentor@whu.edu.cn", passwordHash: demoPasswordHash, role: "mentor", status: "正常" },
       { id: "demo_user_01", name: "陈星", email: "chenxing@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
@@ -141,10 +145,6 @@ function demoData() {
       { id: "demo_recruit_04", targetType: "competition", targetId: "demo_competition_03", competitionId: "demo_competition_03", studentId: "demo_student_04", title: "蓝桥杯刷题小队", skills: ["C++", "算法"], contact: "QQ 120004", publishTime: "2026-05-22T14:30:00.000Z", status: "招募中" },
       { id: "demo_recruit_05", targetType: "competition", targetId: "demo_competition_04", competitionId: "demo_competition_04", studentId: "demo_student_05", title: "黑客松缺 UI 和后端", skills: ["Figma", "Java"], contact: "QQ 120005", publishTime: "2026-05-23T10:20:00.000Z", status: "招募中" },
       { id: "demo_recruit_06", targetType: "competition", targetId: "demo_competition_05", competitionId: "demo_competition_05", studentId: "demo_student_06", title: "创新大赛商业计划搭档", skills: ["商业计划", "调研"], contact: "QQ 120006", publishTime: "2026-05-23T16:40:00.000Z", status: "招募中" },
-      { id: "demo_recruit_07", targetType: "research", targetId: "research_1", researchId: "research_1", studentId: "demo_student_07", title: "RAG 评测和数据清洗组队", skills: ["RAG", "评测"], contact: "QQ 120007", publishTime: "2026-05-24T09:10:00.000Z", status: "招募中" },
-      { id: "demo_recruit_08", targetType: "research", targetId: "demo_research_02", researchId: "demo_research_02", studentId: "demo_student_08", title: "课程资源检索前端搭子", skills: ["Vue", "交互"], contact: "QQ 120008", publishTime: "2026-05-24T11:10:00.000Z", status: "招募中" },
-      { id: "demo_recruit_09", targetType: "research", targetId: "demo_research_03", researchId: "demo_research_03", studentId: "demo_student_09", title: "自动化测试脚本协作", skills: ["Playwright", "测试"], contact: "QQ 120009", publishTime: "2026-05-24T15:10:00.000Z", status: "招募中" },
-      { id: "demo_recruit_10", targetType: "research", targetId: "demo_research_04", researchId: "demo_research_04", studentId: "demo_student_10", title: "低碳出行可视化组队", skills: ["Pandas", "ECharts"], contact: "QQ 120010", publishTime: "2026-05-25T09:10:00.000Z", status: "招募中" },
       { id: "demo_recruit_11", targetType: "competition", targetId: "demo_competition_04", competitionId: "demo_competition_04", studentId: "demo_student_11", title: "黑客松原型已结束招募", skills: ["原型", "演示"], contact: "QQ 120011", publishTime: "2026-05-20T19:10:00.000Z", status: "已结束" }
     ],
     applications: [
@@ -500,12 +500,7 @@ export function getResearchDetail(state, researchId) {
     throw new DomainError("科研项目不存在", "RESEARCH_NOT_FOUND");
   }
 
-  return {
-    ...presentResearchProject(state, research),
-    teamRecruits: state.teamRecruits
-      .filter((recruit) => isRecruitForTarget(recruit, "research", research.id) && isOpenTeamRecruit(recruit))
-      .map((recruit) => presentTeamRecruit(state, recruit))
-  };
+  return presentResearchProject(state, research);
 }
 
 export function listTeamRecruitsForStudent(state, studentUserId) {
@@ -1501,23 +1496,17 @@ function isOpenTeamRecruit(recruit) {
 
 function resolveTeamRecruitTarget(state, payload) {
   const targetType = payload.targetType ?? (payload.researchId ? "research" : "competition");
+  if (targetType === "research") {
+    throw new DomainError("科研项目请直接向导师提交申请，不支持发布组队公告", "RESEARCH_RECRUIT_UNSUPPORTED");
+  }
+
   const targetId = requiredText(
     payload.targetId ?? payload.researchId ?? payload.competitionId,
-    targetType === "research" ? "科研项目" : "竞赛"
+    "竞赛"
   );
 
-  if (targetType === "research") {
-    const research = state.researchProjects.find((item) => item.id === targetId);
-    if (!research) {
-      throw new DomainError("科研项目不存在", "RESEARCH_NOT_FOUND");
-    }
-    if (research.status !== "招募中") {
-      throw new DomainError("项目已停止招募", "RESEARCH_CLOSED");
-    }
-    return {
-      type: "research",
-      id: research.id
-    };
+  if (targetType !== "competition") {
+    throw new DomainError("不支持的组队机会类型", "TEAM_RECRUIT_TARGET_UNSUPPORTED");
   }
 
   const competition = state.competitions.find((item) => item.id === targetId);

@@ -17,6 +17,8 @@ test("student home shows records while create actions live only in detail views"
   assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.student-record-grid[\s\S]*grid-template-columns:\s*1fr/);
   assert.match(app, /data-detail-recruit-form/);
   assert.match(app, /data-detail-research-apply-form/);
+  assert.match(app, /if \(type === "research"\) \{[\s\S]*data-detail-research-apply-form/);
+  assert.doesNotMatch(app, /const applyForm = type === "research"/);
   assert.match(app, /renderDetailStudentActions\("research", id\)/);
   assert.match(app, /getResearchDetail\(state, id\)/);
   assert.doesNotMatch(app, /renderOpportunityTargetOptions/);

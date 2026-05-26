@@ -18,6 +18,8 @@ test("opportunity view action navigates to a dedicated detail page", async () =>
   assert.match(app, /renderDetailStudentActions/);
   assert.match(app, /data-detail-recruit-form/);
   assert.match(app, /data-detail-research-apply-form/);
+  assert.doesNotMatch(app, /opportunityRecruitPageKey\("research", id\)/);
+  assert.doesNotMatch(app, /paginateItems\(research\.teamRecruits/);
   assert.match(app, /focusOpportunityDetail/);
   assert.match(app, /scrollIntoView/);
   assert.match(app, /focus\(\{ preventScroll: true \}\)/);
@@ -25,5 +27,8 @@ test("opportunity view action navigates to a dedicated detail page", async () =>
 
   assert.match(styles, /\.layout\.is-detail-page/);
   assert.match(styles, /\.detail-action-grid/);
+  assert.match(styles, /\.detail-hero\s*\{[\s\S]*text-align:\s*center/);
+  assert.match(styles, /\.detail-hero h2\s*\{[\s\S]*text-align:\s*center/);
+  assert.match(styles, /\.research-detail-grid\s*\{[\s\S]*grid-template-columns/);
   assert.match(styles, /\.item-card:focus-within/);
 });

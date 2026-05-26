@@ -141,6 +141,49 @@ h3 {
   align-items: start;
 }
 
+.detail-panel {
+  min-height: calc(100vh - 132px);
+  padding: 22px clamp(20px, 4vw, 48px) 34px;
+  background: var(--panel);
+}
+
+.detail-back {
+  margin-bottom: 12px;
+}
+
+.detail-hero {
+  max-width: 820px;
+  margin: 0 auto 26px;
+  text-align: center;
+}
+
+.detail-hero .eyebrow {
+  display: block;
+}
+
+.detail-hero h2 {
+  margin-bottom: 12px;
+  font-size: 28px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.detail-hero p {
+  margin: 0 auto;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.detail-facts {
+  max-width: 980px;
+  margin: 0 auto 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px 20px;
+  background: #fbfcfd;
+}
+
 .student-record-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -155,11 +198,74 @@ h3 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  margin: 18px 0;
+  max-width: 1100px;
+  margin: 18px auto 28px;
 }
 
 .detail-action-grid form {
   align-content: start;
+}
+
+.detail-action-grid.is-single {
+  grid-template-columns: minmax(280px, 560px);
+  justify-content: center;
+}
+
+.detail-action-grid form,
+.research-overview,
+.research-apply-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+  background: #fbfcfd;
+}
+
+.detail-list {
+  max-width: 1100px;
+  margin: 28px auto 0;
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+}
+
+.research-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.08fr) minmax(280px, 0.92fr);
+  gap: 18px;
+  max-width: 1040px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.research-detail-grid.is-overview-only {
+  grid-template-columns: minmax(280px, 720px);
+  justify-content: center;
+}
+
+.research-overview .meta-grid {
+  margin: 18px 0 22px;
+}
+
+.technology-heading {
+  margin-top: 6px;
+}
+
+.research-tags {
+  gap: 8px;
+}
+
+.research-tags span {
+  padding: 7px 11px;
+  color: var(--accent-strong);
+  background: #e5f2f2;
+  font-weight: 700;
+}
+
+.research-apply-panel form {
+  margin-top: 14px;
+}
+
+.research-apply-panel textarea {
+  min-height: 150px;
 }
 
 .section-head,
@@ -651,8 +757,22 @@ dd {
   }
 
   .student-record-grid,
-  .detail-action-grid {
+  .detail-action-grid,
+  .research-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .detail-panel {
+    min-height: 0;
+    padding: 20px;
+  }
+
+  .detail-hero h2 {
+    font-size: 24px;
+  }
+
+  .detail-facts {
+    padding: 16px;
   }
 
   .project-row,

@@ -66,7 +66,8 @@ test("initial demo state looks like an active campus MVP", () => {
   assert.ok(state.users.length >= 12);
   assert.ok(state.competitions.length >= 5);
   assert.ok(state.researchProjects.length >= 4);
-  assert.ok(state.teamRecruits.length >= 10);
+  assert.ok(state.teamRecruits.length >= 7);
+  assert.ok(state.teamRecruits.every((recruit) => recruit.targetType === "competition"));
   assert.ok(state.applications.length >= 6);
   assert.ok(state.usageEvents.length >= 15);
 });
@@ -559,28 +560,36 @@ test("student can publish a team recruit for an existing competition", () => {
   );
 });
 
-test("student can publish a team recruit for an open research project", () => {
+test("research projects accept direct applications rather than team recruits", () => {
   const registered = registerStudent(createInitialState(), {
-    name: "科研组队同学",
+    name: "科研申请同学",
     email: "research-recruit@whu.edu.cn",
     password: "Passw0rd!",
     major: "软件工程",
     githubUrl: ""
   });
 
-  const created = createTeamRecruit(registered.state, {
-    targetType: "research",
-    targetId: "research_1",
-    studentUserId: registered.user.id,
-    title: "寻找 RAG 评测搭子",
-    skills: ["RAG", "评测"],
-    contact: "QQ 654321"
-  });
+  assert.throws(
+    () => createTeamRecruit(registered.state, {
+      targetType: "research",
+      targetId: "research_1",
+      studentUserId: registered.user.id,
+      title: "错误的科研组队公告",
+      skills: ["RAG", "评测"],
+      contact: "QQ 654321"
+    }),
+    (error) => error.code === "RESEARCH_RECRUIT_UNSUPPORTED"
+  );
 
-  const detail = getResearchDetail(created.state, "research_1");
-  assert.ok(detail.teamRecruits.some((recruit) => recruit.id === created.recruit.id));
-  assert.equal(created.recruit.targetType, "research");
-  assert.equal(created.recruit.opportunityTitle, detail.title);
+  const applied = applyToResearchProject(registered.state, {
+    researchId: "research_1",
+    studentUserId: registered.user.id,
+    statement: "我有检索系统实践经验，希望直接参与导师项目。"
+  });
+  const detail = getResearchDetail(applied.state, "research_1");
+
+  assert.equal("teamRecruits" in detail, false);
+  assert.equal(applied.application.targetType, "research");
 });
 
 test("legacy team recruit statuses are presented with the current wording", () => {

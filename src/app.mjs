@@ -871,41 +871,51 @@ function renderOpportunityDetail(type, id) {
     const pageKey = opportunityRecruitPageKey("competition", id);
     const recruitsPage = paginateItems(detail.teamRecruits, pageKey);
     selectors.detailPanel.innerHTML = `
-      <button class="secondary" data-back-home type="button">返回机会大厅</button>
-      <span class="eyebrow">竞赛详情</span>
-      <h2>${escapeHtml(detail.title)}</h2>
-      <p>${escapeHtml(detail.description)}</p>
-      <dl class="meta-grid">
+      <button class="secondary detail-back" data-back-home type="button">返回机会大厅</button>
+      <header class="detail-hero">
+        <span class="eyebrow">竞赛详情</span>
+        <h2>${escapeHtml(detail.title)}</h2>
+        <p>${escapeHtml(detail.description)}</p>
+      </header>
+      <dl class="meta-grid detail-facts">
         <div><dt>级别</dt><dd>${escapeHtml(detail.level)}</dd></div>
         <div><dt>时间</dt><dd>${escapeHtml(detail.startDate)} 至 ${escapeHtml(detail.endDate)}</dd></div>
         <div><dt>交流群</dt><dd>${escapeHtml(detail.qqGroup)}</dd></div>
       </dl>
       ${renderDetailStudentActions("competition", id)}
-      <h3>所有人的组队公告</h3>
-      ${renderRecruitList(recruitsPage.items)}
-      <nav class="pagination compact-pagination">${renderPagination(pageKey, recruitsPage.totalPages, `${detail.title}组队公告`)}</nav>
+      <section class="detail-list">
+        <p class="eyebrow">组队公告</p>
+        <h3>所有人的组队公告</h3>
+        ${renderRecruitList(recruitsPage.items)}
+        <nav class="pagination compact-pagination">${renderPagination(pageKey, recruitsPage.totalPages, `${detail.title}组队公告`)}</nav>
+      </section>
     `;
     return;
   }
 
   const research = getResearchDetail(state, id);
-  const pageKey = opportunityRecruitPageKey("research", id);
-  const recruitsPage = paginateItems(research.teamRecruits, pageKey);
+  const overviewClass = session?.user.role === "student" ? "" : " is-overview-only";
   selectors.detailPanel.innerHTML = `
-    <button class="secondary" data-back-home type="button">返回机会大厅</button>
-    <span class="eyebrow">科研项目详情</span>
-    <h2>${escapeHtml(research.title)}</h2>
-    <p>${escapeHtml(research.description)}</p>
-    <dl class="meta-grid">
-      <div><dt>方向</dt><dd>${escapeHtml(research.direction)}</dd></div>
-      <div><dt>技术栈</dt><dd>${research.techStack.map(escapeHtml).join(" / ")}</dd></div>
-      <div><dt>导师</dt><dd>${escapeHtml(research.mentorName)}</dd></div>
-      <div><dt>状态</dt><dd>${escapeHtml(research.status)}</dd></div>
-    </dl>
-    ${renderDetailStudentActions("research", id)}
-    <h3>所有人的组队公告</h3>
-    ${renderRecruitList(recruitsPage.items)}
-    <nav class="pagination compact-pagination">${renderPagination(pageKey, recruitsPage.totalPages, `${research.title}组队公告`)}</nav>
+    <button class="secondary detail-back" data-back-home type="button">返回机会大厅</button>
+    <header class="detail-hero">
+      <span class="eyebrow">科研项目详情</span>
+      <h2>${escapeHtml(research.title)}</h2>
+      <p>${escapeHtml(research.description)}</p>
+    </header>
+    <div class="research-detail-grid${overviewClass}">
+      <section class="research-overview">
+        <p class="eyebrow">项目需求</p>
+        <h3>导师招募信息</h3>
+        <dl class="meta-grid">
+          <div><dt>研究方向</dt><dd>${escapeHtml(research.direction)}</dd></div>
+          <div><dt>指导导师</dt><dd>${escapeHtml(research.mentorName)}</dd></div>
+          <div><dt>招募状态</dt><dd>${escapeHtml(research.status)}</dd></div>
+        </dl>
+        <p class="eyebrow technology-heading">技术栈</p>
+        <div class="tag-row research-tags">${research.techStack.map((skill) => `<span>${escapeHtml(skill)}</span>`).join("")}</div>
+      </section>
+      ${renderDetailStudentActions("research", id)}
+    </div>
   `;
 }
 
@@ -914,24 +924,26 @@ function renderDetailStudentActions(type, id) {
     return "";
   }
 
-  const actionLabel = type === "competition" ? "为这个竞赛发布组队" : "为这个科研发布组队";
-  const applyForm = type === "research"
-    ? `
-      <form data-detail-research-apply-form data-research-id="${escapeHtml(id)}">
-        <h3>申请这个科研项目</h3>
-        <label>
-          个人陈述
-          <textarea name="statement" required placeholder="写下你的相关经历和可投入时间"></textarea>
-        </label>
-        <button type="submit">提交申请</button>
-      </form>
-    `
-    : "";
+  if (type === "research") {
+    return `
+      <section class="research-apply-panel">
+        <p class="eyebrow">直接申请</p>
+        <form data-detail-research-apply-form data-research-id="${escapeHtml(id)}">
+          <h3>向导师提交申请</h3>
+          <label>
+            个人陈述
+            <textarea name="statement" required placeholder="写下你的相关经历和可投入时间"></textarea>
+          </label>
+          <button type="submit">提交申请</button>
+        </form>
+      </section>
+    `;
+  }
 
   return `
-    <div class="detail-action-grid">
-      <form data-detail-recruit-form data-target-type="${escapeHtml(type)}" data-target-id="${escapeHtml(id)}">
-        <h3>${actionLabel}</h3>
+    <div class="detail-action-grid is-single">
+      <form data-detail-recruit-form data-target-type="competition" data-target-id="${escapeHtml(id)}">
+        <h3>为这个竞赛发布组队</h3>
         <label>
           标题
           <input name="title" required placeholder="寻找前端、算法或答辩同学">
@@ -946,7 +958,6 @@ function renderDetailStudentActions(type, id) {
         </label>
         <button type="submit">发布组队</button>
       </form>
-      ${applyForm}
     </div>
   `;
 }
