@@ -84,7 +84,7 @@ function withDemoData(baseState) {
 function demoData() {
   const demoPasswordHash = hashPassword("Passw0rd!");
   return {
-    demoSeedVersion: 3,
+    demoSeedVersion: 4,
     users: [
       { id: "user_mentor_1", name: "周老师", email: "zhoumentor@whu.edu.cn", passwordHash: demoPasswordHash, role: "mentor", status: "正常" },
       { id: "demo_user_01", name: "陈星", email: "chenxing@whu.edu.cn", passwordHash: demoPasswordHash, role: "student", status: "正常" },
@@ -105,9 +105,9 @@ function demoData() {
       { id: "demo_user_17", name: "演示管理员", email: "admin.demo@whu.edu.cn", passwordHash: demoPasswordHash, role: "admin", status: "正常" }
     ],
     students: [
-      { id: "demo_student_01", userId: "demo_user_01", major: "软件工程", githubUrl: "https://github.com/demo-chenxing" },
-      { id: "demo_student_02", userId: "demo_user_02", major: "计算机科学", githubUrl: "https://github.com/demo-lizhou" },
-      { id: "demo_student_03", userId: "demo_user_03", major: "信息安全", githubUrl: "https://github.com/demo-wangyu" },
+      { id: "demo_student_01", userId: "demo_user_01", major: "软件工程", githubUrl: "https://github.com/demo-chenxing", bio: "偏前端和产品原型，擅长把想法快速做成可演示版本。", awards: ["服务外包校赛一等奖", "校园黑客松最佳展示奖"] },
+      { id: "demo_student_02", userId: "demo_user_02", major: "计算机科学", githubUrl: "https://github.com/demo-lizhou", bio: "主要做后端接口和数据库设计，喜欢整理清晰的项目文档。", awards: ["数据库课程设计优秀项目"] },
+      { id: "demo_student_03", userId: "demo_user_03", major: "信息安全", githubUrl: "https://github.com/demo-wangyu", bio: "关注论文写作、实验设计和安全方向验证。", awards: ["挑战杯院赛二等奖"] },
       { id: "demo_student_04", userId: "demo_user_04", major: "人工智能", githubUrl: "" },
       { id: "demo_student_05", userId: "demo_user_05", major: "软件工程", githubUrl: "" },
       { id: "demo_student_06", userId: "demo_user_06", major: "数据科学", githubUrl: "" },
@@ -201,7 +201,7 @@ function mergeDemoData(state, demo) {
     ...state,
     demoSeedVersion: demo.demoSeedVersion,
     users: mergeRecordsById(state.users, demo.users),
-    students: mergeRecordsById(state.students, demo.students),
+    students: mergeStudentRecords(state.students, demo.students),
     admins: mergeRecordsById(state.admins, demo.admins),
     mentors: mergeRecordsById(state.mentors, demo.mentors),
     certificateCollectors: mergeRecordsById(state.certificateCollectors, demo.certificateCollectors),
@@ -221,6 +221,21 @@ function mergeRecordsById(existing = [], additions = []) {
     }
   });
   return [...records.values()];
+}
+
+function mergeStudentRecords(existing = [], additions = []) {
+  const additionsById = new Map(additions.map((record) => [record.id, record]));
+  return mergeRecordsById(existing, additions).map((record) => {
+    const addition = additionsById.get(record.id);
+    if (!addition) {
+      return record;
+    }
+    return {
+      ...record,
+      bio: record.bio ?? addition.bio ?? "",
+      awards: record.awards ?? addition.awards ?? []
+    };
+  });
 }
 
 function normalizeTeamRecruitRecords(recruits = []) {
@@ -270,7 +285,9 @@ export function registerUser(state, payload) {
       id: nextId("student", next.students),
       userId: user.id,
       major: optionalText(payload.major, "未填写专业"),
-      githubUrl: payload.githubUrl?.trim() ?? ""
+      githubUrl: payload.githubUrl?.trim() ?? "",
+      bio: "",
+      awards: []
     });
   }
   if (role === "mentor") {
@@ -747,6 +764,30 @@ export function listCertificateRecords(state, studentUserId) {
   return state.certificateRecords
     .filter((record) => record.studentId === student.id)
     .map((record) => presentCertificateRecord(state, record));
+}
+
+export function getStudentProfile(state, studentId) {
+  const student = state.students.find((candidate) => candidate.id === studentId);
+  if (!student) {
+    throw new DomainError("学生主页不存在", "STUDENT_PROFILE_NOT_FOUND");
+  }
+  return presentStudentProfile(state, student);
+}
+
+export function updateStudentProfile(state, studentUserId, payload) {
+  const next = cloneState(state);
+  const student = findStudentByUserId(next, studentUserId);
+
+  student.major = optionalText(payload.major, student.major ?? "未填写专业");
+  student.githubUrl = `${payload.githubUrl ?? ""}`.trim();
+  student.bio = optionalText(payload.bio, "");
+  student.awards = normalizeAwardRecords(payload.awards);
+  student.profileUpdatedAt = new Date().toISOString();
+
+  return {
+    state: next,
+    profile: presentStudentProfile(next, student)
+  };
 }
 
 export function deleteCertificateRecord(state, studentUserId, certificateRecordId) {
@@ -1244,13 +1285,20 @@ function normalizeTags(tags, label) {
   const values = Array.isArray(tags)
     ? tags
     : `${tags ?? ""}`
-        .split(",")
+        .split(/[，,]/)
         .map((tag) => tag.trim());
   const normalized = values.map((tag) => `${tag}`.trim()).filter(Boolean);
   if (normalized.length === 0) {
     throw new DomainError(`${label}不能为空`, "REQUIRED_FIELD");
   }
   return normalized;
+}
+
+function normalizeAwardRecords(awards) {
+  const values = Array.isArray(awards)
+    ? awards
+    : `${awards ?? ""}`.split(/[\n；;]/);
+  return values.map((award) => `${award}`.trim()).filter(Boolean);
 }
 
 function normalizeReviewDecision(decision) {
@@ -1334,6 +1382,7 @@ function usageActionLabel(action) {
     filter_opportunities: "筛选机会",
     paginate_opportunities: "切换机会分页",
     paginate_list: "切换列表分页",
+    update_student_profile: "更新个人主页",
     publish_team_recruit: "发布组队招募",
     update_team_recruit: "更新组队招募",
     stop_team_recruit: "结束组队招募",
@@ -1450,6 +1499,29 @@ function presentCertificateRecord(state, certificateRecord) {
   };
 }
 
+function presentStudentProfile(state, student) {
+  const user = state.users.find((candidate) => candidate.id === student.userId);
+  const certificates = certificateRecordsOf(state)
+    .filter((record) => record.studentId === student.id)
+    .map((record) => presentCertificateRecord(state, record));
+  const teamRecruits = state.teamRecruits
+    .filter((recruit) => recruit.studentId === student.id)
+    .map((recruit) => presentTeamRecruit(state, recruit));
+
+  return {
+    studentId: student.id,
+    userId: student.userId,
+    name: user?.name ?? "未知学生",
+    email: user?.email ?? "",
+    major: student.major ?? "未填写专业",
+    githubUrl: student.githubUrl ?? "",
+    bio: student.bio ?? student.profileBio ?? "",
+    awards: normalizeAwardRecords(student.awards ?? student.awardRecords ?? []),
+    certificates,
+    teamRecruits
+  };
+}
+
 function presentResearchProject(state, project) {
   const mentor = state.mentors.find((candidate) => candidate.id === project.mentorId);
   const user = state.users.find((candidate) => candidate.id === mentor?.userId);
@@ -1512,6 +1584,7 @@ function presentTeamRecruit(state, recruit) {
     introduction: recruit.introduction ?? "",
     status: normalizeTeamRecruitStatus(recruit.status),
     publisherName: user?.name ?? "未知学生",
+    publisherProfileId: student?.id ?? "",
     opportunityTitle,
     targetLabel: targetType === "competition" ? "竞赛" : "科研项目",
     competitionTitle: competition?.title ?? opportunityTitle

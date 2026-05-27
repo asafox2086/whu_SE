@@ -14,6 +14,7 @@
       </div>
       <div class="session-tools">
         <span class="user-badge" data-user-badge>未登录</span>
+        <button class="secondary" data-profile-link hidden>个人主页</button>
         <button class="secondary" data-logout hidden>退出登录</button>
       </div>
     </header>
@@ -85,6 +86,14 @@
         <p>查看竞赛招募或科研申请入口。</p>
       </section>
 
+      <section class="profile-panel" data-profile-panel data-app-panel data-page-panel="profile" hidden>
+        <p class="eyebrow">个人主页</p>
+        <h2>学生主页</h2>
+        <div data-profile-view></div>
+        <form data-profile-form hidden></form>
+        <div data-profile-certificates></div>
+      </section>
+
       <section class="student-record-grid" data-role-panel="student" data-app-panel data-page-panel="home" hidden>
         <section class="panel action-panel">
           <h2>我的组队公告</h2>
@@ -99,30 +108,64 @@
         </section>
       </section>
 
-      <section class="panel certificate-panel" data-role-panel="student" data-app-panel data-page-panel="home" hidden>
-        <p class="eyebrow">证书中心</p>
-        <h2>上传与查看证书</h2>
-        <form data-certificate-form>
-          <label>
-            关联竞赛
-            <select name="competitionId"></select>
-          </label>
-          <label>
-            奖项等级
-            <input name="awardLevel" required placeholder="二等奖">
-          </label>
-          <label>
-            获奖时间
-            <input name="awardDate" type="date" required>
-          </label>
-          <label>
-            证书文件
-            <input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png" required>
-          </label>
-          <button type="submit">保存记录</button>
-        </form>
-        <div class="stack" data-certificate-list></div>
-        <nav class="pagination compact-pagination" data-certificate-list-pagination aria-label="个人证书分页"></nav>
+      <section class="support-grid" data-app-panel data-page-panel="home" hidden>
+        <section class="panel certificate-panel" data-role-panel="student" data-app-panel data-page-panel="home" hidden>
+          <p class="eyebrow">证书中心</p>
+          <h2>上传与查看证书</h2>
+          <form data-certificate-form>
+            <label>
+              关联竞赛
+              <select name="competitionId"></select>
+            </label>
+            <label>
+              奖项等级
+              <input name="awardLevel" required placeholder="二等奖">
+            </label>
+            <label>
+              获奖时间
+              <input name="awardDate" type="date" required>
+            </label>
+            <label>
+              证书文件
+              <input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png" required>
+            </label>
+            <button type="submit">保存记录</button>
+          </form>
+          <div class="stack" data-certificate-list></div>
+          <nav class="pagination compact-pagination" data-certificate-list-pagination aria-label="个人证书分页"></nav>
+        </section>
+
+        <section class="panel feedback-panel" data-app-panel data-page-panel="home" hidden>
+          <p class="eyebrow">MVP 验证</p>
+          <h2>使用反馈</h2>
+          <form data-feedback-form>
+            <label>
+              联系方式
+              <input name="contact" required placeholder="邮箱 / QQ / 微信">
+            </label>
+            <label>
+              用户痛点
+              <input name="painPoint" required placeholder="找队友信息太分散">
+            </label>
+            <label>
+              评分
+              <select name="rating">
+                <option value="5">5</option>
+                <option value="4">4</option>
+                <option value="3">3</option>
+                <option value="2">2</option>
+                <option value="1">1</option>
+              </select>
+            </label>
+            <label>
+              反馈内容
+              <textarea name="message" required placeholder="写下这次试用哪里顺、哪里卡"></textarea>
+            </label>
+            <button type="submit">提交反馈</button>
+          </form>
+          <div class="stack" data-feedback-list></div>
+          <nav class="pagination compact-pagination" data-feedback-list-pagination aria-label="反馈分页"></nav>
+        </section>
       </section>
 
       <section class="panel certificate-panel" data-role-panel="certificate_collector" data-app-panel data-page-panel="home" hidden>
@@ -250,37 +293,6 @@
         <nav class="pagination compact-pagination" data-mentor-applications-pagination aria-label="科研申请队列分页"></nav>
       </section>
 
-      <section class="panel mentor-panel" data-app-panel data-page-panel="home" hidden>
-        <p class="eyebrow">MVP 验证</p>
-        <h2>使用反馈</h2>
-        <form data-feedback-form>
-          <label>
-            联系方式
-            <input name="contact" required placeholder="邮箱 / QQ / 微信">
-          </label>
-          <label>
-            用户痛点
-            <input name="painPoint" required placeholder="找队友信息太分散">
-          </label>
-          <label>
-            评分
-            <select name="rating">
-              <option value="5">5</option>
-              <option value="4">4</option>
-              <option value="3">3</option>
-              <option value="2">2</option>
-              <option value="1">1</option>
-            </select>
-          </label>
-          <label>
-            反馈内容
-            <textarea name="message" required placeholder="写下这次试用哪里顺、哪里卡"></textarea>
-          </label>
-          <button type="submit">提交反馈</button>
-        </form>
-        <div class="stack" data-feedback-list></div>
-        <nav class="pagination compact-pagination" data-feedback-list-pagination aria-label="反馈分页"></nav>
-      </section>
     </main>
 
     <aside class="toast" data-toast hidden></aside>

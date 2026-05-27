@@ -18,6 +18,7 @@ import {
   getDatabaseSnapshot,
   getCompetitionDetail,
   getResearchDetail,
+  getStudentProfile,
   listRegisteredUsers,
   listCertificateRecords,
   listCertificateCollection,
@@ -37,6 +38,7 @@ import {
   stopTeamRecruit,
   submitFeedback,
   updateTeamRecruit,
+  updateStudentProfile,
   uploadCertificateRecord
 } from "../src/domain.mjs";
 
@@ -715,6 +717,52 @@ test("student can upload a valid certificate record and list it later", () => {
   const records = listCertificateRecords(uploaded.state, registered.user.id);
   assert.equal(records.length, 1);
   assert.equal(records[0].competitionTitle, "中国大学生服务外包创新创业大赛");
+});
+
+test("student profile stores introductions, awards, and certificate highlights", () => {
+  const registered = registerStudent(createInitialState(), {
+    name: "主页同学",
+    email: "profile@whu.edu.cn",
+    password: "Passw0rd!",
+    major: "软件工程",
+    githubUrl: "https://github.com/profile-before"
+  });
+  const uploaded = uploadCertificateRecord(registered.state, {
+    studentUserId: registered.user.id,
+    competitionId: "competition_1",
+    awardLevel: "一等奖",
+    awardDate: "2026-05-08",
+    fileName: "profile-award.jpg",
+    fileSizeBytes: 128 * 1024,
+    fileDataUrl: "data:image/jpeg;base64,cHJvZmlsZQ=="
+  });
+  const updated = updateStudentProfile(uploaded.state, registered.user.id, {
+    major: "软件工程",
+    githubUrl: "https://github.com/profile-after",
+    bio: "喜欢做前端、产品和答辩。",
+    awards: "服务外包一等奖\n校级黑客松最佳创意"
+  });
+  const profile = getStudentProfile(updated.state, updated.profile.studentId);
+
+  assert.equal(profile.name, "主页同学");
+  assert.equal(profile.bio, "喜欢做前端、产品和答辩。");
+  assert.deepEqual(profile.awards, ["服务外包一等奖", "校级黑客松最佳创意"]);
+  assert.equal(profile.githubUrl, "https://github.com/profile-after");
+  assert.equal(profile.certificates.length, 1);
+  assert.equal(profile.certificates[0].awardLevel, "一等奖");
+
+  const recruited = createTeamRecruit(updated.state, {
+    competitionId: "competition_1",
+    studentUserId: registered.user.id,
+    title: "主页可见的队伍",
+    introduction: "准备冲刺答辩。",
+    skills: ["Vue"],
+    contact: "QQ 123123"
+  });
+  const detail = getCompetitionDetail(recruited.state, "competition_1");
+  const recruit = detail.teamRecruits.find((candidate) => candidate.id === recruited.recruit.id);
+
+  assert.equal(recruit.publisherProfileId, profile.studentId);
 });
 
 test("image certificate records keep a visible preview", () => {

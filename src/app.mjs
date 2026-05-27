@@ -15,6 +15,7 @@ import {
   getAdminDatabaseView,
   getCompetitionDetail,
   getResearchDetail,
+  getStudentProfile,
   listCertificateCollection,
   listCertificateCollectionByCompetition,
   listCertificateRecords,
@@ -35,6 +36,7 @@ import {
   submitFeedback,
   unblockUser,
   updateTeamRecruit,
+  updateStudentProfile,
   uploadCertificateRecord
 } from "./domain.mjs";
 
@@ -46,6 +48,7 @@ let session = loadSession();
 let selectedOpportunityType = "all";
 let selectedOpportunityId = "";
 let selectedOpportunityDetailType = "";
+let selectedProfileStudentId = "";
 let selectedOpportunityPage = 1;
 let currentPage = "home";
 const opportunityPageSize = 6;
@@ -56,6 +59,7 @@ let pendingStateSave = Promise.resolve();
 
 const selectors = {
   userBadge: document.querySelector("[data-user-badge]"),
+  profileButton: document.querySelector("[data-profile-link]"),
   logoutButton: document.querySelector("[data-logout]"),
   appContent: document.querySelector("[data-app-content]"),
   authPanel: document.querySelector("[data-auth-panel]"),
@@ -67,6 +71,7 @@ const selectors = {
   opportunityList: document.querySelector("[data-opportunity-list]"),
   opportunityPagination: document.querySelector("[data-opportunity-pagination]"),
   detailPanel: document.querySelector("[data-detail-panel]"),
+  profilePanel: document.querySelector("[data-profile-panel]"),
   studentRecruits: document.querySelector("[data-student-recruits]"),
   studentRecruitsPagination: document.querySelector("[data-student-recruits-pagination]"),
   studentApplications: document.querySelector("[data-student-applications]"),
@@ -94,12 +99,15 @@ const selectors = {
 };
 
 selectors.authForm.addEventListener("submit", handleAuthSubmit);
+selectors.profileButton.addEventListener("click", handleProfileButtonClick);
 selectors.logoutButton.addEventListener("click", handleLogout);
 selectors.opportunityFilters.addEventListener("click", handleOpportunityFilter);
 selectors.opportunityList.addEventListener("click", handleOpportunityClick);
 selectors.opportunityPagination.addEventListener("click", handleOpportunityPageClick);
 selectors.appContent.addEventListener("click", handleListPageClick);
+selectors.appContent.addEventListener("click", handleProfileNavigationClick);
 selectors.detailPanel.addEventListener("click", handleRecruitManagementClick);
+selectors.profilePanel.addEventListener("click", handleProfilePanelClick);
 selectors.studentRecruits.addEventListener("click", handleRecruitManagementClick);
 selectors.studentApplications.addEventListener("click", handleStudentApplicationsClick);
 selectors.certificateForm.addEventListener("submit", handleCertificateSubmit);
@@ -115,6 +123,7 @@ selectors.mentorProjects.addEventListener("click", handleMentorProjectsClick);
 selectors.mentorApplications.addEventListener("submit", handleMentorApplicationReviewSubmit);
 selectors.detailPanel.addEventListener("submit", handleDetailPanelSubmit);
 selectors.detailPanel.addEventListener("submit", handleTeamRecruitEditSubmit);
+selectors.profilePanel.addEventListener("submit", handleProfileSubmit);
 selectors.studentRecruits.addEventListener("submit", handleTeamRecruitEditSubmit);
 window.addEventListener("hashchange", handleRouteChange);
 
@@ -161,11 +170,21 @@ function handleLogout() {
   render();
 }
 
+function handleProfileButtonClick() {
+  const studentId = getCurrentStudentId();
+  if (!studentId) {
+    return;
+  }
+  navigateToProfile(studentId);
+}
+
 function handleRouteChange() {
   syncRouteFromLocation();
   render();
   if (currentPage === "opportunity-detail") {
     focusOpportunityDetail();
+  } else if (currentPage === "profile") {
+    focusProfilePanel();
   }
 }
 
@@ -200,6 +219,15 @@ function handleListPageClick(event) {
   listPages[button.dataset.listPageKey] = Number(button.dataset.listPage);
   trackUsage("paginate_list", button.dataset.listPageKey);
   render();
+}
+
+function handleProfileNavigationClick(event) {
+  const button = event.target.closest("button[data-profile-student-id]");
+  if (!button) {
+    return;
+  }
+  event.preventDefault();
+  navigateToProfile(button.dataset.profileStudentId);
 }
 
 function handleOpportunityClick(event) {
@@ -285,6 +313,42 @@ function handleTeamRecruitEditSubmit(event) {
   } catch (error) {
     showToast(error.message, true);
   }
+}
+
+function handleProfileSubmit(event) {
+  const profileForm = event.target.closest("form[data-profile-form]");
+  if (!profileForm) {
+    return;
+  }
+
+  event.preventDefault();
+  try {
+    requireSession();
+    const form = new FormData(profileForm);
+    const updated = updateStudentProfile(state, session.user.id, {
+      major: form.get("major"),
+      githubUrl: form.get("githubUrl"),
+      bio: form.get("bio"),
+      awards: form.get("awards")
+    });
+    state = updated.state;
+    selectedProfileStudentId = updated.profile.studentId;
+    trackUsage("update_student_profile", updated.profile.studentId);
+    saveState();
+    showToast("个人主页已更新");
+    render();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function handleProfilePanelClick(event) {
+  const backButton = event.target.closest("button[data-profile-back-home]");
+  if (!backButton) {
+    return;
+  }
+  navigateHome();
+  render();
 }
 
 function handleRecruitManagementClick(event) {
@@ -696,6 +760,7 @@ function render() {
   renderOpportunities();
   renderForms();
   renderSelectedOpportunityDetail();
+  renderSelectedProfile();
   renderStudentRecruits();
   renderStudentApplications();
   renderCertificates();
@@ -712,16 +777,33 @@ function renderSelectedOpportunityDetail() {
   }
 }
 
+function renderSelectedProfile() {
+  if (currentPage === "profile" && selectedProfileStudentId) {
+    renderProfile(selectedProfileStudentId);
+  }
+}
+
 function syncRouteFromLocation() {
-  const match = window.location.hash.match(/^#\/opportunities\/(competition|research)\/([^/?#]+)/);
-  if (!match) {
-    currentPage = "home";
+  const opportunityMatch = window.location.hash.match(/^#\/opportunities\/(competition|research)\/([^/?#]+)/);
+  if (opportunityMatch) {
+    currentPage = "opportunity-detail";
+    selectedOpportunityDetailType = opportunityMatch[1];
+    selectedOpportunityId = decodeURIComponent(opportunityMatch[2]);
+    selectedProfileStudentId = "";
     return;
   }
 
-  currentPage = "opportunity-detail";
-  selectedOpportunityDetailType = match[1];
-  selectedOpportunityId = decodeURIComponent(match[2]);
+  const profileMatch = window.location.hash.match(/^#\/profiles\/([^/?#]+)/);
+  if (profileMatch) {
+    currentPage = "profile";
+    selectedProfileStudentId = decodeURIComponent(profileMatch[1]);
+    selectedOpportunityId = "";
+    selectedOpportunityDetailType = "";
+    return;
+  }
+
+  currentPage = "home";
+  selectedProfileStudentId = "";
 }
 
 function navigateToOpportunityDetail(type, id) {
@@ -737,10 +819,25 @@ function navigateToOpportunityDetail(type, id) {
   window.location.hash = nextHash;
 }
 
+function navigateToProfile(studentId) {
+  selectedProfileStudentId = studentId;
+  selectedOpportunityId = "";
+  selectedOpportunityDetailType = "";
+  currentPage = "profile";
+  const nextHash = `#/profiles/${encodeURIComponent(studentId)}`;
+  if (window.location.hash === nextHash) {
+    render();
+    focusProfilePanel();
+    return;
+  }
+  window.location.hash = nextHash;
+}
+
 function navigateHome() {
   currentPage = "home";
   selectedOpportunityId = "";
   selectedOpportunityDetailType = "";
+  selectedProfileStudentId = "";
   if (window.location.hash) {
     window.location.hash = "#/";
   }
@@ -751,11 +848,13 @@ function renderAuth() {
     ? `${session.user.name} · ${roleLabel(session.user.role)}`
     : "未登录";
   selectors.userBadge.hidden = !session;
+  selectors.profileButton.hidden = !session || session.user.role !== "student";
   selectors.logoutButton.hidden = !session;
   selectors.authPanel.hidden = Boolean(session);
   selectors.appContent.classList.toggle("is-auth-screen", !session);
   selectors.appContent.classList.toggle("is-logged-in", Boolean(session));
   selectors.appContent.classList.toggle("is-detail-page", currentPage === "opportunity-detail");
+  selectors.appContent.classList.toggle("is-profile-page", currentPage === "profile");
   selectors.appPanels.forEach((panel) => {
     const role = panel.dataset.rolePanel;
     const panelPage = panel.dataset.pagePanel ?? "home";
@@ -954,6 +1053,107 @@ function renderOpportunityDetail(type, id) {
   `;
 }
 
+function renderProfile(studentId) {
+  const profile = getStudentProfile(state, studentId);
+  const isOwner = session?.user.id === profile.userId;
+
+  selectors.profilePanel.setAttribute("tabindex", "-1");
+  selectors.profilePanel.setAttribute("aria-live", "polite");
+  selectors.profilePanel.innerHTML = `
+    <button class="secondary detail-back" data-profile-back-home type="button">返回机会大厅</button>
+    <header class="profile-hero">
+      <span class="eyebrow">个人主页</span>
+      <h2>${escapeHtml(profile.name)}</h2>
+      <p>${profile.bio ? escapeHtml(profile.bio) : "这个同学还没有填写个人简介。"}</p>
+    </header>
+    <div class="profile-grid">
+      <section class="profile-card">
+        <p class="eyebrow">基本信息</p>
+        <dl class="meta-grid profile-meta">
+          <div><dt>专业</dt><dd>${escapeHtml(profile.major)}</dd></div>
+          <div><dt>GitHub</dt><dd>${profile.githubUrl ? `<a href="${escapeHtml(profile.githubUrl)}" target="_blank" rel="noreferrer">${escapeHtml(profile.githubUrl)}</a>` : "未填写"}</dd></div>
+        </dl>
+        <h3>获奖记录</h3>
+        ${renderProfileAwards(profile.awards)}
+        <h3>证书</h3>
+        <div data-profile-certificates>${renderProfileCertificates(profile.certificates)}</div>
+      </section>
+      ${isOwner ? renderProfileEditor(profile) : renderProfileActivity(profile)}
+    </div>
+  `;
+}
+
+function renderProfileEditor(profile) {
+  return `
+    <section class="profile-card">
+      <p class="eyebrow">编辑主页</p>
+      <form data-profile-form data-student-id="${escapeHtml(profile.studentId)}">
+        <label>
+          专业
+          <input name="major" required value="${escapeHtml(profile.major)}">
+        </label>
+        <label>
+          GitHub
+          <input name="githubUrl" placeholder="https://github.com/you" value="${escapeHtml(profile.githubUrl)}">
+        </label>
+        <label>
+          个人简介
+          <textarea name="bio" placeholder="介绍一下你擅长的方向、项目经历和组队偏好">${escapeHtml(profile.bio)}</textarea>
+        </label>
+        <label>
+          获奖记录
+          <textarea name="awards" placeholder="一行写一个奖项，例如：服务外包一等奖">${escapeHtml(profile.awards.join("\n"))}</textarea>
+        </label>
+        <button type="submit">保存个人主页</button>
+      </form>
+    </section>
+  `;
+}
+
+function renderProfileActivity(profile) {
+  return `
+    <section class="profile-card">
+      <p class="eyebrow">组队动态</p>
+      <h3>发起的组队</h3>
+      ${profile.teamRecruits.length === 0
+        ? `<p class="empty">还没有公开组队记录。</p>`
+        : profile.teamRecruits.slice(0, 4).map((recruit) => `
+          <section class="mini-card">
+            <strong>${escapeHtml(recruit.title)}</strong>
+            <span>${escapeHtml(recruit.opportunityTitle)} · ${escapeHtml(recruit.status)}</span>
+            ${recruit.introduction ? `<small>${escapeHtml(recruit.introduction)}</small>` : ""}
+          </section>
+        `).join("")}
+    </section>
+  `;
+}
+
+function renderProfileAwards(awards) {
+  if (awards.length === 0) {
+    return `<p class="empty">还没有填写获奖记录。</p>`;
+  }
+  return `
+    <ul class="profile-awards">
+      ${awards.map((award) => `<li>${escapeHtml(award)}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function renderProfileCertificates(certificates) {
+  if (certificates.length === 0) {
+    return `<p class="empty">还没有公开证书记录。</p>`;
+  }
+  return certificates
+    .map((record) => `
+      <section class="mini-card">
+        ${renderCertificatePreview(record)}
+        <strong>${escapeHtml(record.competitionTitle)}</strong>
+        <span>${escapeHtml(record.awardLevel)} · ${escapeHtml(record.awardDate)}</span>
+      </section>
+    `)
+    .join("");
+}
+
 function renderDetailStudentActions(type, id) {
   if (!session || session.user.role !== "student") {
     return "";
@@ -1006,6 +1206,11 @@ function focusOpportunityDetail() {
   selectors.detailPanel.focus({ preventScroll: true });
 }
 
+function focusProfilePanel() {
+  selectors.profilePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  selectors.profilePanel.focus({ preventScroll: true });
+}
+
 function renderRecruitList(recruits) {
   if (recruits.length === 0) {
     return `<p class="empty">暂无招募，登录后可发布第一条。</p>`;
@@ -1022,7 +1227,12 @@ function renderRecruitList(recruits) {
             <div class="recruit-main">
               <span class="status-pill ${recruit.status === "招募中" ? "is-open" : "is-closed"}">${escapeHtml(recruit.status)}</span>
               <strong>${escapeHtml(recruit.title)}</strong>
-              <span class="recruit-meta">${escapeHtml(recruit.targetLabel ?? "竞赛")} · ${escapeHtml(recruit.opportunityTitle ?? recruit.competitionTitle)} · ${escapeHtml(recruit.publisherName)}</span>
+              <span class="recruit-meta">
+                ${escapeHtml(recruit.targetLabel ?? "竞赛")} · ${escapeHtml(recruit.opportunityTitle ?? recruit.competitionTitle)} ·
+                ${recruit.publisherProfileId
+                  ? `<button class="profile-inline-link" type="button" data-profile-student-id="${escapeHtml(recruit.publisherProfileId)}">${escapeHtml(recruit.publisherName)}</button>`
+                  : escapeHtml(recruit.publisherName)}
+              </span>
               ${recruit.introduction ? `<p class="recruit-introduction">${escapeHtml(recruit.introduction)}</p>` : ""}
               <span class="recruit-contact">联系方式：${escapeHtml(recruit.contact)}</span>
               <div class="recruit-tags">
